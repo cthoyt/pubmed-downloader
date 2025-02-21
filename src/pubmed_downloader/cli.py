@@ -10,9 +10,9 @@ __all__ = [
 @click.command()
 def main() -> None:
     """CLI for pubmed_downloader."""
-    from .api import iterate_articles
+    from .api import process_articles
 
-    list(iterate_articles())
+    process_articles()
 
 
 if __name__ == "__main__":

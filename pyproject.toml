@@ -59,6 +59,7 @@ dependencies = [
     "beautifulsoup4",
     "pystow",
     "pydantic",
+    "lxml",
 ]
 
 [project.optional-dependencies]

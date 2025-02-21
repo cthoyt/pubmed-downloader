@@ -23,9 +23,24 @@ from tqdm.contrib.concurrent import thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 __all__ = [
+    "ISSN",
+    "AbstractText",
+    "Article",
+    "Author",
+    "Heading",
+    "Journal",
+    "Qualifier",
     "ensure_baselines",
     "ensure_updates",
-    "iterate_articles",
+    "iterate_ensure_articles",
+    "iterate_ensure_baselines",
+    "iterate_ensure_updates",
+    "iterate_process_articles",
+    "iterate_process_baselines",
+    "iterate_process_updates",
+    "process_articles",
+    "process_baselines",
+    "process_updates",
 ]
 
 logger = logging.getLogger(__name__)
@@ -47,22 +62,33 @@ def _download_updates(url: str) -> Path:
 
 
 class ISSN(BaseModel):
+    """Represents an ISSSN number, annotated with its type."""
+
     value: str
     type: Literal["Print", "Electronic"]
 
 
 class Qualifier(BaseModel):
+    """Represents a MeSH qualifier."""
+
     mesh: str
     major: bool = False
 
 
 class Heading(BaseModel):
+    """Represents a MeSH heading annnotation."""
+
     descriptor: str
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
 
 class Journal(BaseModel):
+    """Represents a refernece to a journal.
+
+    Note, full information about a journal can be loaded elsewhere.
+    """
+
     issn: str | None = Field(
         None, description="The ISSN used for linking, since there might be many"
     )
@@ -71,12 +97,16 @@ class Journal(BaseModel):
 
 
 class AbstractText(BaseModel):
+    """Represents an abstract text object."""
+
     text: str
     label: str | None = None
     category: str | None = None
 
 
 class Author(BaseModel):
+    """Represents an author."""
+
     valid: bool = True
     affiliations: list[str] = Field(default_factory=list)
     # must have at least one of name/orcid
@@ -100,14 +130,6 @@ class Article(BaseModel):
     authors: list[Author]
 
 
-def iterate_articles() -> Iterable[Article]:
-    """Iterate over all parsed articles."""
-    for path in ensure_baselines():
-        yield from _parse_from_path(path)
-    for path in ensure_updates():
-        yield from _parse_from_path(path)
-
-
 def _get_urls(url: str) -> list[str]:
     res = requests.get(url, timeout=300)
     res.raise_for_status()
@@ -121,7 +143,12 @@ def _get_urls(url: str) -> list[str]:
 
 def _parse_from_path(path: Path) -> Iterable[Article]:
     # with open(path, mode="rb") as file:
-    tree = etree.parse(path)  # noqa:S320
+    try:
+        tree = etree.parse(path)  # noqa:S320
+    except etree.XMLSyntaxError:
+        tqdm.write(f"failed to parse {path}")
+        return
+
     for pubmed_article in tree.findall("PubmedArticle"):
         article = _extract_article(pubmed_article)
         if article:
@@ -223,6 +250,44 @@ def _parse_yn(s: str) -> bool:
             raise ValueError(s)
 
 
+ORCID_PREFIXES = [
+    "https://orcid.org/",
+    "http://orcid.org/",
+    "https//orcid.org/",
+    "https/orcid.org/",
+    "http//orcid.org/",
+    "http/orcid.org/",
+    "orcid.org/",
+    "https://orcid.org",
+    "https://orcid.org-",
+    "http://orcid/",
+    "https://orcid.org ",
+    "https://www.orcid.org/",
+]
+
+
+def _clean_orcid(s: str) -> str | None:
+    for p in ORCID_PREFIXES:
+        if s.startswith(p):
+            return s[len(p) :]
+    if len(s) == 19:
+        return s
+    elif len(s) == 18:
+        # malformed, someone forgot the last value
+        return None
+    elif len(s) == 16 and s.isnumeric():
+        # malformed, forgot dashes
+        return f"{s[:4]}-{s[4:8]}-{s[8:12]}-{s[12:]}"
+    elif len(s) == 17 and s.startswith("s") and s[1:].isnumeric():
+        return f"{s[1:5]}-{s[5:9]}-{s[9:13]}-{s[13:]}"
+    elif len(s) == 20:
+        # extra character got OCR'd, mostly from linking to affiliations
+        return s[:20]
+    else:
+        logger.warning(f"unhandled ORCID: {s}")
+        return None
+
+
 def _parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
     valid = _parse_yn(tag.attrib["ValidYN"])
@@ -235,25 +300,8 @@ def _parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
         elif not it.text:
             continue
         else:
-            if it.text.startswith("https://orcid.org/"):
-                orcid = it.text.removeprefix("https://orcid.org/")
-            elif it.text.startswith("orcid.org/"):
-                orcid = it.text.removeprefix("orcid.org/")
-            elif it.text.startswith("http://orcid.org/"):
-                orcid = it.text.removeprefix("http://orcid.org/")
-            elif len(it.text) == 19:
-                orcid = it.text
-            elif len(it.text) == 18:
-                # malformed, someone forgot the last value
-                continue
-            elif len(it.text) == 16 and it.text.isnumeric():
-                # malformed, forgot dashes
-                t = it.text
-                orcid = f"{t[:4]}-{t[4:8]}-{t[8:12]}-{t[12:]}"
-            elif len(it.text) == 20:
-                # extra character got OCR'd, mostly from linking to affiliations
-                orcid = it.text[:20]
-            else:
+            orcid = _clean_orcid(it.text)
+            if not orcid:
                 logger.warning(f"unhandled ORCID: {it.text}")
 
     last_name_tag = tag.find("LastName")
@@ -340,24 +388,97 @@ def _parse_date(date_tag: Element | None) -> datetime.date | None:
 
 def ensure_baselines() -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(
-        thread_map(
-            _download_baseline,
-            _get_urls(BASELINE_URL),
-            desc="Downloading PubMed baseline",
-        )
+    return list(iterate_ensure_baselines())
+
+
+def iterate_ensure_baselines() -> Iterable[Path]:
+    """Ensure all the baseline files are downloaded."""
+    yield from thread_map(
+        _download_baseline,
+        _get_urls(BASELINE_URL),
+        desc="Downloading PubMed baseline",
+    )
+
+
+def process_baselines() -> list[Article]:
+    """Ensure and process all baseline files."""
+    return list(iterate_process_baselines())
+
+
+def iterate_process_baselines() -> Iterable[Article]:
+    """Ensure and process all baseline files."""
+    paths = ensure_baselines()
+    return itt.chain.from_iterable(
+        _process_xml_gz(path)
+        for path in tqdm(paths, unit_scale=True, unit="baseline", desc="Processing baselines")
     )
 
 
 def ensure_updates() -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(
-        thread_map(
-            _download_updates,
-            _get_urls(UPDATES_URL),
-            desc="Downloading PubMed updates",
-        )
+    return list(iterate_ensure_updates())
+
+
+def iterate_ensure_updates() -> Iterable[Path]:
+    """Ensure all the baseline files are downloaded."""
+    yield from thread_map(
+        _download_updates,
+        _get_urls(UPDATES_URL),
+        desc="Downloading PubMed updates",
     )
+
+
+def process_updates() -> list[Article]:
+    """Ensure and process updates."""
+    return list(iterate_process_updates())
+
+
+def iterate_process_updates() -> Iterable[Article]:
+    """Ensure and process updates."""
+    paths = ensure_updates()
+    return itt.chain.from_iterable(
+        _process_xml_gz(path)
+        for path in tqdm(paths, unit_scale=True, unit="update", desc="Processing updates")
+    )
+
+
+def process_articles() -> list[Article]:
+    """Ensure and process articles from baseline, then updates."""
+    return list(iterate_process_articles())
+
+
+def iterate_process_articles() -> Iterable[Article]:
+    """Ensure and process articles from baseline, then updates."""
+    return itt.chain(iterate_process_baselines(), iterate_process_updates())
+
+
+def iterate_ensure_articles() -> Iterable[Path]:
+    """Ensure articles from baseline, then updates."""
+    return itt.chain(iterate_ensure_baselines(), iterate_ensure_updates())
+
+
+def _process_xml_gz(path: Path) -> list[Article]:
+    """Process an XML file, cache a JSON version, and return it."""
+    new_name = path.stem.removesuffix(".xml")
+    new_path = path.with_stem(new_name).with_suffix(".json.gz")
+    if new_path.is_file():
+        with gzip.open(new_path, mode="rt") as file:
+            return [Article.model_validate(part) for part in json.load(file)]
+
+    with logging_redirect_tqdm():
+        models = list(_parse_from_path(path))
+
+    processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
+    with gzip.open(new_path, mode="wt") as file:
+        json.dump(
+            processed,
+            file,
+            default=lambda o: o.isoformat()
+            if isinstance(o, datetime.date | datetime.datetime)
+            else o,
+        )
+
+    return models
 
 
 @click.command()
@@ -373,22 +494,7 @@ def _main() -> None:
         tqdm(ensure_baselines(), desc="Processing baselines"),
     )
     for path in paths:
-        new_path = path.with_suffix(".json.gz")
-        if new_path.is_file():
-            continue
-        with logging_redirect_tqdm():
-            processed = [
-                model.model_dump(exclude_none=True, exclude_defaults=True)
-                for model in _parse_from_path(path)
-            ]
-        with gzip.open(new_path, mode="wt") as file:
-            json.dump(
-                processed,
-                file,
-                default=lambda o: o.isoformat()
-                if isinstance(o, datetime.date | datetime.datetime)
-                else o,
-            )
+        rv.extend(_process_xml_gz(path))
 
 
 if __name__ == "__main__":
