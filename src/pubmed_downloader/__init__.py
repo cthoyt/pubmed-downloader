@@ -1,9 +1,9 @@
 """Automate downloading and processing PubMed."""
 
-from .api import hello, square
+from .api import ensure_baselines, ensure_updates, iterate_articles
 
-# being explicit about exports is important!
 __all__ = [
-    "hello",
-    "square",
+    "ensure_baselines",
+    "ensure_updates",
+    "iterate_articles",
 ]

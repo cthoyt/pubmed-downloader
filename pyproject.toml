@@ -40,7 +40,9 @@ classifiers = [
 keywords = [
     "snekpack", # please keep this keyword to credit the cookiecutter-snekpack template
     "cookiecutter",
-    # TODO add your own free-text keywords
+    "PubMed",
+    "MEDLINE",
+    "biomedical literature",
 ]
 
 # License Information.
@@ -51,11 +53,12 @@ license-files = [
 
 requires-python = ">=3.10"
 dependencies = [
-    "more_itertools", # missing from itertools in stdlib
     "tqdm", # progress bars
     "click",
-    "more_click",
-    "typing-extensions",
+    "requests",
+    "beautifulsoup4",
+    "pystow",
+    "pydantic",
 ]
 
 [project.optional-dependencies]
@@ -65,13 +68,9 @@ tests = [
 ]
 docs = [
     "sphinx>=8",
-    "sphinx-rtd-theme>=3.0","sphinx-click", 
+    "sphinx-rtd-theme>=3.0",
+    "sphinx-click",
     "sphinx_automodapi",
-    # Include if your project uses Pydantic:
-    # "autodoc_pydantic",
-    # To include LaTeX comments easily in your docs.
-    # If you uncomment this, don't forget to do the same in docs/conf.py
-    # texext
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
