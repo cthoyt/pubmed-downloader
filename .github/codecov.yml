@@ -1,0 +1,4 @@
+# see https://docs.codecov.com/v4.6/docs/codecov-yaml
+ignore:
+  - "src/pubmed_downloader/__main__.py"
+  - "src/pubmed_downloader/cli.py"

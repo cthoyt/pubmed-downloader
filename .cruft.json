@@ -1,0 +1,31 @@
+{
+  "template": "https://github.com/cthoyt/cookiecutter-snekpack",
+  "commit": "c180948ff00b5aef1f8d1ace373cc7af66f8491c",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "package_name": "pubmed_downloader",
+      "package_name_stylized": "PubMed Downloader",
+      "short_description": "Automate downloading and processing PubMed",
+      "author_name": "Charles Tapley Hoyt",
+      "author_github": "cthoyt",
+      "author_email": "cthoyt@gmail.com",
+      "github_organization_name": "cthoyt",
+      "github_repository_name": "pubmed-downloader",
+      "command_line_interface": true,
+      "gitlab": false,
+      "runner": "tox",
+      "__not_charlie": "",
+      "__runner": "tox -e",
+      "__runner_uv": "--with tox-uv tox -e",
+      "__runner_pip": "tox tox-uv",
+      "__runner_install_uv": "uv tool install tox --with tox-uv",
+      "__runner_install_pip": "python3 -m pip install tox tox-uv",
+      "__runner_tests": "py",
+      "__gh_slug": "cthoyt/pubmed-downloader",
+      "_template": "https://github.com/cthoyt/cookiecutter-snekpack",
+      "_commit": "c180948ff00b5aef1f8d1ace373cc7af66f8491c"
+    }
+  },
+  "directory": null
+}
