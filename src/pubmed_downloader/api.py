@@ -142,7 +142,6 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(path: Path) -> Iterable[Article]:
-    # with open(path, mode="rb") as file:
     try:
         tree = etree.parse(path)  # noqa:S320
     except etree.XMLSyntaxError:
@@ -397,6 +396,7 @@ def iterate_ensure_baselines() -> Iterable[Path]:
         _download_baseline,
         _get_urls(BASELINE_URL),
         desc="Downloading PubMed baseline",
+        leave=False,
     )
 
 
@@ -425,6 +425,7 @@ def iterate_ensure_updates() -> Iterable[Path]:
         _download_updates,
         _get_urls(UPDATES_URL),
         desc="Downloading PubMed updates",
+        leave=False,
     )
 
 
@@ -449,36 +450,40 @@ def process_articles() -> list[Article]:
 
 def iterate_process_articles() -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    return itt.chain(iterate_process_baselines(), iterate_process_updates())
+    yield from iterate_process_baselines()
+    yield from iterate_process_updates()
 
 
 def iterate_ensure_articles() -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    return itt.chain(iterate_ensure_baselines(), iterate_ensure_updates())
+    yield from iterate_ensure_baselines()
+    yield from iterate_ensure_updates()
 
 
-def _process_xml_gz(path: Path) -> list[Article]:
+def _process_xml_gz(path: Path) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
     new_name = path.stem.removesuffix(".xml")
     new_path = path.with_stem(new_name).with_suffix(".json.gz")
     if new_path.is_file():
         with gzip.open(new_path, mode="rt") as file:
-            return [Article.model_validate(part) for part in json.load(file)]
+            for part in json.load(file):
+                yield Article.model_validate(part)
 
-    with logging_redirect_tqdm():
-        models = list(_parse_from_path(path))
+    else:
+        with logging_redirect_tqdm():
+            models = list(_parse_from_path(path))
 
-    processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
-    with gzip.open(new_path, mode="wt") as file:
-        json.dump(
-            processed,
-            file,
-            default=lambda o: o.isoformat()
-            if isinstance(o, datetime.date | datetime.datetime)
-            else o,
-        )
+        processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
+        with gzip.open(new_path, mode="wt") as file:
+            json.dump(
+                processed,
+                file,
+                default=lambda o: o.isoformat()
+                if isinstance(o, datetime.date | datetime.datetime)
+                else o,
+            )
 
-    return models
+        yield from models
 
 
 @click.command()
