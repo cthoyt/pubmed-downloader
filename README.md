@@ -37,14 +37,15 @@ Automate downloading and processing PubMed.
 
 ## 💪 Getting Started
 
-The following will download and parse all 30M+ articles into nice Pydantic
-models.
+The following will download all 30M+ articles and give lists of paths to them on
+the local filesystem, organized with
+[`pystow`](https://github.com/cthoyt/pystow).
 
 ```python
-from pubmed_downloader import iterate_articles
+from pubmed_downloader import ensure_baselines, ensure_updates
 
-for article in iterate_articles():
-    pass  # do something with each article
+baseline_paths = ensure_baselines()
+updates_paths = ensure_updates()
 ```
 
 ## 🚀 Installation
