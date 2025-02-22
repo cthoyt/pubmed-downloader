@@ -23,6 +23,7 @@ from .utils import (
     ISSN,
     MODULE,
     Author,
+    Collective,
     Heading,
     _json_default,
     parse_author,
@@ -97,7 +98,7 @@ class Article(BaseModel):
     headings: list[Heading] = Field(default_factory=list)
     journal: Journal
     abstract: list[AbstractText] = Field(default_factory=list)
-    authors: list[Author]
+    authors: list[Author | Collective]
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -202,7 +203,7 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
     authors = [
         author
         for x in medline_citation.findall(".//AuthorList/Author")
-        if (author := parse_author(pubmed, x))
+        if (author := parse_author(x))
     ]
 
     return Article(

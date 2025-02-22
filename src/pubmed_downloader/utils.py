@@ -64,20 +64,39 @@ class Author(BaseModel):
     # must have at least one of name/orcid
     name: str | None = None
     orcid: str | None = None
+    roles: list[str] = Field(default_factory=list)
 
 
-def parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
+class Collective(BaseModel):
+    """Represents an author."""
+
+    name: str
+    roles: list[str] = Field(default_factory=list)
+
+
+STARTS = (
+    "https://open-na.hosted.exlibrisgroup.com/alma/01NLM_INST/authorities",
+    "http://viaf.org/viaf/sourceID/",
+    "http://id.loc.gov/authorities/names/",
+    "http://id.worldcat.org/fast/",
+    "http://id.nlm.nih.gov/mesh/",
+)
+
+
+def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collective | None:  # noqa:C901
     """Parse an author XML object."""
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
-    valid = _parse_yn(tag.attrib["ValidYN"])
+    valid = _parse_yn(tag.attrib["ValidYN"]) if "ValidYN" in tag.attrib else True
 
     orcid = None
     for it in tag.findall("Identifier"):
-        source = it.attrib.get("Source")
-        if source != "ORCID":
-            logger.warning("unhandled identifier source: %s", source)
-        elif not it.text:
+        if not it.text:
             continue
+        source = it.attrib.get("Source")
+        if any(it.text.startswith(uri_prefix) for uri_prefix in STARTS):
+            pass
+        elif source != "ORCID":
+            logger.warning("unhandled identifier source: %s - %s (%s)", source, it.text, it.attrib)
         else:
             orcid = _clean_orcid(it.text)
             if not orcid:
@@ -88,9 +107,10 @@ def parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
     initials_tag = tag.find("Initials")
     collective_name_tag = tag.find("CollectiveName")
 
-    if collective_name_tag is not None:
-        logger.debug(f"[pubmed:{pubmed}] skipping collective name: %s", collective_name_tag.text)
-        return None
+    roles = [role_tag.text for role_tag in tag.findall("Role")]
+
+    if collective_name_tag is not None and collective_name_tag.text:
+        return Collective(name=collective_name_tag.text.rstrip("."), roles=roles)
 
     if last_name_tag is None:
         if orcid is not None:
@@ -98,6 +118,7 @@ def parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
                 valid=valid,
                 affiliations=affiliations,
                 orcid=orcid,
+                roles=roles,
             )
         remainder = {
             subtag.tag
@@ -117,24 +138,26 @@ def parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
                 valid=valid,
                 affiliations=affiliations,
                 orcid=orcid,
+                roles=roles,
             )
         remainder = {
             subtag.tag
             for subtag in tag
             if subtag.tag not in {"LastName", "ForeName", "Initials", "AffiliationInfo"}
         }
-        # TOO can come back to this and do more debugging
+        # TODO can come back to this and do more debugging
         logger.debug(
-            f"[pubmed:{pubmed}] no forename given in {tag} w/ last name {last_name_tag.text}. "
+            f"[{doc_key}] no forename given in {tag} w/ last name {last_name_tag.text}. "
             f"Other tags to check: {remainder}"
         )
         return None
 
     return Author(
-        valid=_parse_yn(tag.attrib["ValidYN"]),
+        valid=valid,
         name=name,
         affiliations=affiliations,
         orcid=orcid,
+        roles=roles,
     )
 
 
@@ -173,7 +196,7 @@ def parse_mesh_heading(tag: Element) -> Heading | None:
 
 def _get_mesh_id(descriptor_name_tag: Element) -> str | None:
     if "UI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["UI"]
+        return descriptor_name_tag.attrib["UI"].removeprefix("https://id.nlm.nih.gov/mesh/")
     elif "URI" in descriptor_name_tag.attrib:
         return descriptor_name_tag.attrib["URI"].removeprefix("https://id.nlm.nih.gov/mesh/")
     else:

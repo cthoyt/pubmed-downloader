@@ -9,7 +9,7 @@ import itertools as itt
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 from xml.etree.ElementTree import Element
 
 import requests
@@ -23,9 +23,12 @@ from tqdm.contrib.concurrent import thread_map
 from .utils import (
     ISSN,
     MODULE,
+    Author,
+    Collective,
     Heading,
     _get_mesh_id,
     _json_default,
+    parse_author,
     parse_date,
     parse_mesh_heading,
 )
@@ -48,6 +51,7 @@ J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
 
 CATALOG_CATFILE_MODULE = MODULE.module("catalog-catfile")
 CATALOG_SERFILE_MODULE = MODULE.module("catalog-serfile")
+CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
 
 
 class Journal(BaseModel):
@@ -233,6 +237,7 @@ class CatalogRecord(BaseModel):
     issns: list[ISSN] = Field(default_factory=list)
     issn_linking: ISSN | None = None
     publisher: str | None = None
+    authors: list[Author | Collective] = Field(default_factory=list)
 
     @property
     def nlm_catalog_url(self) -> str:
@@ -279,6 +284,8 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
 
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
 
+    authors = [author for x in tag.findall(".//AuthorList/Author") if (author := parse_author(x))]
+
     publication_info_tag = tag.find("PublicationInfo")
     start_year = None
     end_year = None
@@ -290,6 +297,8 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
         end_year_ = publication_info_tag.findtext("PublicationEndYear")
         if end_year_ and len(end_year_) == 4 and end_year_.isnumeric():
             end_year = int(end_year_)
+        if end_year == 9999:
+            end_year = None
         # TODO More information about publisher available here
 
         imprint_tag = publication_info_tag.find("Imprint")
@@ -316,7 +325,7 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
 
     return CatalogRecord(
         nlm_catalog_id=nlm_catalog_id,
-        title=title,
+        title=title.rstrip("."),
         publication_type_mesh_ids=publication_type_mesh_ids,
         mesh_headings=mesh_headings,
         date_created=parse_date(tag.find("DateCreated")),
@@ -330,6 +339,7 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
         issns=issns,
         issn_linking=issn_linking,
         publisher=publisher,
+        authors=authors,
     )
 
 
@@ -342,7 +352,10 @@ def _process_other_id(tag: Element) -> Reference | None:
 
 def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
-    return list(iterate_process_catalog(force=force, force_process=force_process))
+    rv = list(iterate_process_catalog(force=force, force_process=force_process))
+    with gzip.open(CATALOG_PROCESSED_GZ_PATH, mode="wt") as file:
+        _dump_catalog(rv, file, indent=2)
+    return rv
 
 
 def iterate_process_catalog(
@@ -378,16 +391,22 @@ def _parse_catalog(path: Path, *, force_process: bool = False) -> Iterable[Catal
                 catalog_records.append(catalog_record)
 
         with gzip.open(cache_path, mode="wt") as file:
-            json.dump(
-                [
-                    catalog_record.model_dump(exclude_none=True, exclude_defaults=True)
-                    for catalog_record in catalog_records
-                ],
-                file,
-                default=_json_default,
-            )
+            _dump_catalog(catalog_records, file)
 
         yield from catalog_records
+
+
+def _dump_catalog(catalog_records: list[CatalogRecord], file: TextIO, **kwargs: Any) -> None:
+    json.dump(
+        [
+            catalog_record.model_dump(exclude_none=True, exclude_defaults=True)
+            for catalog_record in catalog_records
+        ],
+        file,
+        default=_json_default,
+        **kwargs,
+        ensure_ascii=False,
+    )
 
 
 def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
