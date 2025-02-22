@@ -134,11 +134,14 @@ def _get_urls(url: str) -> list[str]:
     res = requests.get(url, timeout=300)
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "html.parser")
-    return [
-        url + href  # type:ignore
-        for link in soup.find_all("a")
-        if (href := link.get("href")) and href.startswith("pubmed") and href.endswith(".xml.gz")  # type:ignore
-    ]
+    return sorted(
+        (
+            url + href  # type:ignore
+            for link in soup.find_all("a")
+            if (href := link.get("href")) and href.startswith("pubmed") and href.endswith(".xml.gz")  # type:ignore
+        ),
+        reverse=True,
+    )
 
 
 def _parse_from_path(path: Path) -> Iterable[Article]:
@@ -450,14 +453,14 @@ def process_articles() -> list[Article]:
 
 def iterate_process_articles() -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    yield from iterate_process_baselines()
     yield from iterate_process_updates()
+    yield from iterate_process_baselines()
 
 
 def iterate_ensure_articles() -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_baselines()
     yield from iterate_ensure_updates()
+    yield from iterate_ensure_baselines()
 
 
 def _process_xml_gz(path: Path) -> Iterable[Article]:
