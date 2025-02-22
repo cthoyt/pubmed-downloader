@@ -16,6 +16,15 @@ from .api import (
     process_baselines,
     process_updates,
 )
+from .catalog import (
+    CatalogRecord,
+    ensure_catalog_provider_links,
+    ensure_catfile_catalog,
+    ensure_journal_overview,
+    ensure_serfile_catalog,
+    process_catalog,
+    process_journal_overview,
+)
 from .utils import ISSN, Author, Heading, Qualifier
 
 __all__ = [
@@ -23,10 +32,15 @@ __all__ = [
     "AbstractText",
     "Article",
     "Author",
+    "CatalogRecord",
     "Heading",
     "Journal",
     "Qualifier",
     "ensure_baselines",
+    "ensure_catalog_provider_links",
+    "ensure_catfile_catalog",
+    "ensure_journal_overview",
+    "ensure_serfile_catalog",
     "ensure_updates",
     "iterate_ensure_articles",
     "iterate_ensure_baselines",
@@ -35,6 +49,9 @@ __all__ = [
     "iterate_process_baselines",
     "iterate_process_updates",
     "process_articles",
+    "process_catalog",
     "process_baselines",
+    "process_catalog_provider_links",
+    "process_journal_overview",
     "process_updates",
 ]

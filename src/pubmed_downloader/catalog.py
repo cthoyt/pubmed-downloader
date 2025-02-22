@@ -31,12 +31,14 @@ from .utils import (
 )
 
 __all__ = [
+    "CatalogRecord",
     "ensure_catalog_provider_links",
     "ensure_catfile_catalog",
     "ensure_journal_overview",
     "ensure_serfile_catalog",
     "process_catalog_provider_links",
     "process_journal_overview",
+    "process_catalog",
 ]
 
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
@@ -323,7 +325,7 @@ def iterate_process_catalog(
     *, force: bool = False, force_process: bool = False
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
-    for path in tqdm(ensure_serfile_catalog(force=force), desc='Processing NLM Catalog'):
+    for path in tqdm(ensure_serfile_catalog(force=force), desc="Processing NLM Catalog"):
         yield from _parse_catalog(path, force_process=force_process or force)
 
 
