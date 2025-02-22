@@ -232,6 +232,7 @@ class CatalogRecord(BaseModel):
     end_year: int | None = None
     issns: list[ISSN] = Field(default_factory=list)
     issn_linking: ISSN | None = None
+    publisher: str | None = None
 
     @property
     def nlm_catalog_url(self) -> str:
@@ -281,6 +282,7 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
     publication_info_tag = tag.find("PublicationInfo")
     start_year = None
     end_year = None
+    publisher = None
     if publication_info_tag is not None:
         start_year_ = publication_info_tag.findtext("PublicationFirstYear")
         if start_year_ and len(start_year_) == 4 and start_year_.isnumeric():
@@ -289,6 +291,13 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
         if end_year_ and len(end_year_) == 4 and end_year_.isnumeric():
             end_year = int(end_year_)
         # TODO More information about publisher available here
+
+        imprint_tag = publication_info_tag.find("Imprint")
+        if imprint_tag is not None:
+            # also Place, DateIssued, and ImprintFull
+            entity_tag = imprint_tag.find("Entity")
+            if entity_tag is not None and entity_tag.text:
+                publisher = entity_tag.text.strip().strip(",").strip()
 
     issns = [
         ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
@@ -320,6 +329,7 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
         end_year=end_year,
         issns=issns,
         issn_linking=issn_linking,
+        publisher=publisher,
     )
 
 
