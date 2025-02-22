@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Literal
 from xml.etree.ElementTree import Element
 
-import click
 import pystow
 import requests
 from bs4 import BeautifulSoup
@@ -487,23 +486,3 @@ def _process_xml_gz(path: Path) -> Iterable[Article]:
             )
 
         yield from models
-
-
-@click.command()
-def _main() -> None:
-    path = Path(__file__).parent.resolve().joinpath("pubmed25n1283.xml")
-    rv = []
-    for _x in list(_parse_from_path(path)):
-        rv.append(_x)
-        click.echo(repr(_x.journal))
-
-    paths = itt.chain(
-        tqdm(ensure_updates(), desc="Processing updates"),
-        tqdm(ensure_baselines(), desc="Processing baselines"),
-    )
-    for path in paths:
-        rv.extend(_process_xml_gz(path))
-
-
-if __name__ == "__main__":
-    _main()
