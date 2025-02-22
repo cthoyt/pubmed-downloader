@@ -38,7 +38,7 @@ class ISSN(BaseModel):
     """Represents an ISSN number, annotated with its type."""
 
     value: str
-    type: Literal["Print", "Electronic", "Undetermined"]
+    type: Literal["Print", "Electronic", "Undetermined", "Linking"]
 
 
 def parse_date(date_tag: Element | None) -> datetime.date | None:

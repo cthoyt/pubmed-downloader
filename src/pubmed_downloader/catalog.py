@@ -36,9 +36,9 @@ __all__ = [
     "ensure_catfile_catalog",
     "ensure_journal_overview",
     "ensure_serfile_catalog",
+    "process_catalog",
     "process_catalog_provider_links",
     "process_journal_overview",
-    "process_catalog",
 ]
 
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
@@ -68,7 +68,8 @@ class Journal(BaseModel):
     end_year: int | None
 
     @property
-    def nlm_url(self) -> str:
+    def nlm_catalog_url(self) -> str:
+        """Get the NLM Catalog URL."""
         return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
 
 
@@ -139,6 +140,11 @@ class CatalogProviderLink(BaseModel):
     nlm_catalog_id: str
     key: str = Field(..., description="Key for the NLM provider, corresponding to ")
     label: str
+
+    @property
+    def nlm_catalog_url(self) -> str:
+        """Get the NLM Catalog URL."""
+        return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
 
 
 def process_catalog_provider_links(*, force: bool = False) -> list[CatalogProviderLink]:
@@ -227,6 +233,11 @@ class CatalogRecord(BaseModel):
     issns: list[ISSN] = Field(default_factory=list)
     issn_linking: ISSN | None = None
 
+    @property
+    def nlm_catalog_url(self) -> str:
+        """Get the NLM Catalog URL."""
+        return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
+
 
 def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
     nlm_catalog_id = tag.findtext("NlmUniqueID")
@@ -290,6 +301,9 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
             if issn.value == issn_linking_value:
                 issn_linking = issn
                 break
+        if issn_linking is None:
+            issn_linking = ISSN(value=issn_linking_value, type="Linking")
+            issns.append(issn_linking)
 
     return CatalogRecord(
         nlm_catalog_id=nlm_catalog_id,
