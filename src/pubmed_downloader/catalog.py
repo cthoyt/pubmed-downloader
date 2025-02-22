@@ -20,7 +20,15 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 
-from pubmed_downloader.utils import ISSN, MODULE, Heading, parse_date, parse_mesh_heading
+from .utils import (
+    ISSN,
+    MODULE,
+    Heading,
+    _get_mesh_id,
+    _json_default,
+    parse_date,
+    parse_mesh_heading,
+)
 
 __all__ = [
     "ensure_catalog_provider_links",
@@ -244,11 +252,16 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
     # TODO ELocationList
 
     publication_type_mesh_ids = sorted(
-        k.attrib["UI"].removeprefix("https://id.nlm.nih.gov/mesh/")
-        for k in tag.findall(".//PublicationTypeList/PublicationType")
+        mesh_id
+        for publication_type_tag in tag.findall(".//PublicationTypeList/PublicationType")
+        if (mesh_id := _get_mesh_id(publication_type_tag))
     )
 
-    mesh_headings = [parse_mesh_heading(x) for x in tag.findall(".//MeshHeadingList/MeshHeading")]
+    mesh_headings = [
+        heading
+        for x in tag.findall(".//MeshHeadingList/MeshHeading")
+        if (heading := parse_mesh_heading(x))
+    ]
 
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
 
@@ -257,10 +270,10 @@ def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
     end_year = None
     if publication_info_tag is not None:
         start_year_ = publication_info_tag.findtext("PublicationFirstYear")
-        if start_year_ and len(start_year_) == 4:
+        if start_year_ and len(start_year_) == 4 and start_year_.isnumeric():
             start_year = int(start_year_)
         end_year_ = publication_info_tag.findtext("PublicationEndYear")
-        if end_year_ and len(end_year_) == 4:
+        if end_year_ and len(end_year_) == 4 and end_year_.isnumeric():
             end_year = int(end_year_)
         # TODO More information about publisher available here
 
@@ -310,7 +323,7 @@ def iterate_process_catalog(
     *, force: bool = False, force_process: bool = False
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
-    for path in _iter_serfile_catalog(force=force):
+    for path in tqdm(ensure_serfile_catalog(force=force), desc='Processing NLM Catalog'):
         yield from _parse_catalog(path, force_process=force_process or force)
 
 
@@ -345,6 +358,7 @@ def _parse_catalog(path: Path, *, force_process: bool = False) -> Iterable[Catal
                     for catalog_record in catalog_records
                 ],
                 file,
+                default=_json_default,
             )
 
         yield from catalog_records

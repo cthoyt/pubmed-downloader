@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Literal
+from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
 import pystow
@@ -38,7 +38,7 @@ class ISSN(BaseModel):
     """Represents an ISSN number, annotated with its type."""
 
     value: str
-    type: Literal["Print", "Electronic"]
+    type: Literal["Print", "Electronic", "Undetermined"]
 
 
 def parse_date(date_tag: Element | None) -> datetime.date | None:
@@ -148,7 +148,7 @@ class Qualifier(BaseModel):
 class Heading(BaseModel):
     """Represents a MeSH heading annnotation."""
 
-    descriptor: str
+    descriptor_mesh_id: str
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
@@ -159,19 +159,26 @@ def parse_mesh_heading(tag: Element) -> Heading | None:
     if descriptor_name_tag is None:
         return None
 
-    if "UI" in descriptor_name_tag.attrib:
-        mesh_id = descriptor_name_tag.attrib["UI"]
-    elif "URI" in descriptor_name_tag.attrib:
-        mesh_id = descriptor_name_tag.attrib["URI"].removeprefix("https://id.nlm.nih.gov/mesh/")
-    else:
-        raise ValueError("unable to get MeSH ID for descriptor")
+    mesh_id = _get_mesh_id(descriptor_name_tag)
+    if mesh_id is None:
+        return None
 
     major = _parse_yn(descriptor_name_tag.attrib["MajorTopicYN"])
     qualifiers = [
         Qualifier(mesh=qualifier.attrib["UI"], major=_parse_yn(qualifier.attrib["MajorTopicYN"]))
         for qualifier in tag.findall("QualifierName")
     ]
-    return Heading(descriptor=mesh_id, major=major, qualifiers=qualifiers or None)
+    return Heading(descriptor_mesh_id=mesh_id, major=major, qualifiers=qualifiers or None)
+
+
+def _get_mesh_id(descriptor_name_tag: Element) -> str | None:
+    if "UI" in descriptor_name_tag.attrib:
+        return descriptor_name_tag.attrib["UI"]
+    elif "URI" in descriptor_name_tag.attrib:
+        return descriptor_name_tag.attrib["URI"].removeprefix("https://id.nlm.nih.gov/mesh/")
+    else:
+        # TODO could do grounding here, but this isn't great
+        return None
 
 
 def _parse_yn(s: str) -> bool:
@@ -204,3 +211,9 @@ def _clean_orcid(s: str) -> str | None:
     else:
         logger.warning(f"unhandled ORCID: {s}")
         return None
+
+
+def _json_default(o: Any) -> Any:
+    if isinstance(o, datetime.date | datetime.datetime):
+        return o.isoformat()
+    return o

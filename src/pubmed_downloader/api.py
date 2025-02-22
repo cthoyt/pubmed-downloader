@@ -19,8 +19,16 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from pubmed_downloader import Author, Heading
-from pubmed_downloader.utils import ISSN, MODULE, parse_author, parse_date, parse_mesh_heading
+from .utils import (
+    ISSN,
+    MODULE,
+    Author,
+    Heading,
+    _json_default,
+    parse_author,
+    parse_date,
+    parse_mesh_heading,
+)
 
 __all__ = [
     "AbstractText",
@@ -159,7 +167,9 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
     )
 
     headings = [
-        parse_mesh_heading(x) for x in medline_citation.findall(".//MeshHeadingList/MeshHeading")
+        heading
+        for x in medline_citation.findall(".//MeshHeadingList/MeshHeading")
+        if (heading := parse_mesh_heading(x))
     ]
 
     issns = [
@@ -298,12 +308,6 @@ def _process_xml_gz(path: Path) -> Iterable[Article]:
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
         with gzip.open(new_path, mode="wt") as file:
-            json.dump(
-                processed,
-                file,
-                default=lambda o: o.isoformat()
-                if isinstance(o, datetime.date | datetime.datetime)
-                else o,
-            )
+            json.dump(processed, file, default=_json_default)
 
         yield from models
