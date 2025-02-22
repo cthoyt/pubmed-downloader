@@ -164,14 +164,16 @@ def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collec
 class Qualifier(BaseModel):
     """Represents a MeSH qualifier."""
 
-    mesh: str
+    mesh_id: str | None
+    name: str
     major: bool = False
 
 
 class Heading(BaseModel):
     """Represents a MeSH heading annnotation."""
 
-    descriptor_mesh_id: str
+    descriptor_mesh_id: str | None
+    name: str | None
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
@@ -182,16 +184,25 @@ def parse_mesh_heading(tag: Element) -> Heading | None:
     if descriptor_name_tag is None:
         return None
 
+    name = descriptor_name_tag.text
     mesh_id = _get_mesh_id(descriptor_name_tag)
-    if mesh_id is None:
+    if not name and not mesh_id:
         return None
 
     major = _parse_yn(descriptor_name_tag.attrib["MajorTopicYN"])
-    qualifiers = [
-        Qualifier(mesh=qualifier.attrib["UI"], major=_parse_yn(qualifier.attrib["MajorTopicYN"]))
-        for qualifier in tag.findall("QualifierName")
-    ]
-    return Heading(descriptor_mesh_id=mesh_id, major=major, qualifiers=qualifiers or None)
+    qualifiers = []
+    for qualifier_tag in tag.findall("QualifierName"):
+        mesh_id = qualifier_tag.attrib.get("UI")
+        qualifiers.append(
+            Qualifier(
+                name=qualifier_tag.text,
+                mesh_id=mesh_id,
+                major=_parse_yn(qualifier_tag.attrib["MajorTopicYN"]),
+            )
+        )
+    return Heading(
+        descriptor_mesh_id=mesh_id, name=name, major=major, qualifiers=qualifiers or None
+    )
 
 
 def _get_mesh_id(descriptor_name_tag: Element) -> str | None:
