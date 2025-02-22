@@ -164,16 +164,16 @@ def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collec
 class Qualifier(BaseModel):
     """Represents a MeSH qualifier."""
 
-    mesh_id: str | None
     name: str
+    mesh_id: str | None
     major: bool = False
 
 
 class Heading(BaseModel):
     """Represents a MeSH heading annnotation."""
 
+    name: str
     descriptor_mesh_id: str | None
-    name: str | None
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
