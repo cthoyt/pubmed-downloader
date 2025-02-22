@@ -1,21 +1,26 @@
+"""Download and parse catalog files from NLM."""
+
 from __future__ import annotations
 
 import csv
+import datetime
 import gzip
 import itertools as itt
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 from xml.etree.ElementTree import Element
 
 import requests
 from bs4 import BeautifulSoup
+from curies import Reference
 from lxml import etree
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 
-from pubmed_downloader.constants import ISSN, MODULE
+from pubmed_downloader.utils import ISSN, MODULE, Heading, parse_date, parse_mesh_heading
 
 __all__ = [
     "ensure_catalog_provider_links",
@@ -101,7 +106,7 @@ def _parse_journals(path: Path) -> Iterable[Journal]:
             if is_delimiter:
                 continue
 
-            data = {}
+            data: dict[str, Any] = {}
             for line in lines:
                 key, partition, value = (s.strip() for s in line.strip().partition(":"))
                 if not partition:
@@ -197,6 +202,104 @@ def _process_journal(element: Element) -> Journal | None:
 class CatalogRecord(BaseModel):
     """Represents a record in the NLM Catalog."""
 
+    nlm_catalog_id: str
+    title: str
+    publication_type_mesh_ids: list[str] = Field(default_factory=list)
+    mesh_headings: list[Heading] = Field(default_factory=list)
+    date_created: datetime.date | None = None
+    date_revised: datetime.date | None = None
+    date_authorized: datetime.date | None = None
+    date_completed: datetime.date | None = None
+    date_revised_major: datetime.date | None = None
+    xrefs: list[Reference] = Field(default_factory=list)
+    start_year: int | None = None
+    end_year: int | None = None
+    issns: list[ISSN] = Field(default_factory=list)
+    issn_linking: ISSN | None = None
+
+
+def _extract_catalog_record(tag: Element) -> CatalogRecord | None:  # noqa:C901
+    nlm_catalog_id = tag.findtext("NlmUniqueID")
+    if not nlm_catalog_id:
+        return None
+
+    title_tags = tag.findall(".//TitleMain/Title")
+    if len(title_tags) == 0:
+        tqdm.write(f"[{nlm_catalog_id}] missing title")
+        return None
+    elif len(title_tags) > 1:
+        tqdm.write(f"[{nlm_catalog_id}] multiple titles")
+    title_tag = title_tags[0]
+    title = title_tag.text
+    if not title:
+        tqdm.write(f"[{nlm_catalog_id}] no title text")
+        return None
+
+    # TODO TitleAlternate
+    # TODO TitleRelated
+    # TODO AuthorList
+    # TODO ResourceInfo
+    # TODO Language
+    # TODO PhysicalDescription
+    # TODO ELocationList
+
+    publication_type_mesh_ids = sorted(
+        k.attrib["UI"].removeprefix("https://id.nlm.nih.gov/mesh/")
+        for k in tag.findall(".//PublicationTypeList/PublicationType")
+    )
+
+    mesh_headings = [parse_mesh_heading(x) for x in tag.findall(".//MeshHeadingList/MeshHeading")]
+
+    xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
+
+    publication_info_tag = tag.find("PublicationInfo")
+    start_year = None
+    end_year = None
+    if publication_info_tag is not None:
+        start_year_ = publication_info_tag.findtext("PublicationFirstYear")
+        if start_year_ and len(start_year_) == 4:
+            start_year = int(start_year_)
+        end_year_ = publication_info_tag.findtext("PublicationEndYear")
+        if end_year_ and len(end_year_) == 4:
+            end_year = int(end_year_)
+        # TODO More information about publisher available here
+
+    issns = [
+        ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
+        for issn_tag in tag.findall("ISSN")
+    ]
+
+    issn_linking = None
+    if issn_linking_value := tag.findtext("ISSNLinking"):
+        for issn in issns:
+            if issn.value == issn_linking_value:
+                issn_linking = issn
+                break
+
+    return CatalogRecord(
+        nlm_catalog_id=nlm_catalog_id,
+        title=title,
+        publication_type_mesh_ids=publication_type_mesh_ids,
+        mesh_headings=mesh_headings,
+        date_created=parse_date(tag.find("DateCreated")),
+        date_revised=parse_date(tag.find("DateRevised")),
+        date_authorized=parse_date(tag.find("DateAuthorized")),
+        date_completed=parse_date(tag.find("DateCompleted")),
+        date_revised_major=parse_date(tag.find("DateRevisedMajor")),
+        xrefs=xrefs,
+        start_year=start_year,
+        end_year=end_year,
+        issns=issns,
+        issn_linking=issn_linking,
+    )
+
+
+def _process_other_id(tag: Element) -> Reference | None:
+    prefix = tag.attrib["Prefix"].lstrip("(").rstrip(")")
+    # attrib also has 'Source',
+    identifier = tag.text
+    return Reference(prefix=prefix, identifier=identifier)
+
 
 def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
@@ -207,7 +310,7 @@ def iterate_process_catalog(
     *, force: bool = False, force_process: bool = False
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
-    for path in _iter_catfile_catalog(force=force):
+    for path in _iter_serfile_catalog(force=force):
         yield from _parse_catalog(path, force_process=force_process or force)
 
 
@@ -227,11 +330,10 @@ def _parse_catalog(path: Path, *, force_process: bool = False) -> Iterable[Catal
         with gzip.open(cache_path, mode="rt") as file:
             for d in json.load(file):
                 yield CatalogRecord.model_validate(d)
-
     else:
         tree = etree.parse(path)  # noqa:S320
         catalog_records = []
-        for tag in tree.findall("PubmedArticle"):
+        for tag in tree.findall("NLMCatalogRecord"):
             catalog_record = _extract_catalog_record(tag)
             if catalog_record:
                 catalog_records.append(catalog_record)
@@ -248,12 +350,8 @@ def _parse_catalog(path: Path, *, force_process: bool = False) -> Iterable[Catal
         yield from catalog_records
 
 
-def _extract_catalog_record(tag: Element) -> CatalogRecord | None:
-    raise NotImplementedError
-
-
 def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
-    return thread_map(
+    return thread_map(  # type:ignore
         lambda x: CATALOG_CATFILE_MODULE.ensure(url=x, force=force),
         _iter_catpluslease_urls(),
         desc="Downloading catalog catfiles",
@@ -262,7 +360,7 @@ def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
 
 
 def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
-    return thread_map(
+    return thread_map(  # type:ignore
         lambda x: CATALOG_SERFILE_MODULE.ensure(url=x, force=force),
         _iter_serfile_urls(),
         desc="Downloading catalog serfiles",
@@ -270,7 +368,7 @@ def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
     )
 
 
-def _iter_catpluslease_urls() -> str:
+def _iter_catpluslease_urls() -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     yield from _iter_catalog_urls(
         base="https://ftp.nlm.nih.gov/projects/catpluslease/",
@@ -279,7 +377,7 @@ def _iter_catpluslease_urls() -> str:
     )
 
 
-def _iter_serfile_urls() -> str:
+def _iter_serfile_urls() -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     yield from _iter_catalog_urls(
         base="https://ftp.nlm.nih.gov/projects/serfilelease/",
@@ -288,13 +386,13 @@ def _iter_serfile_urls() -> str:
     )
 
 
-def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> str:
+def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     res = requests.get(base, timeout=300)
     soup = BeautifulSoup(res.text, "html.parser")
     for link in soup.find_all("a"):
-        href = link.attrs["href"]
-        if href is None:
+        href = link.attrs["href"]  # type:ignore
+        if not isinstance(href, str) or not href:
             tqdm.write(f"link: {link}")
             continue
         if (
@@ -308,4 +406,4 @@ def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> str:
 
 
 if __name__ == "__main__":
-    ensure_serfile_catalog()
+    process_catalog(force_process=True)

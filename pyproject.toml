@@ -60,6 +60,7 @@ dependencies = [
     "pystow",
     "pydantic",
     "lxml",
+    "curies",
 ]
 
 [project.optional-dependencies]

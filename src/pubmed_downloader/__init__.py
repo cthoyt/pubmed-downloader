@@ -3,10 +3,7 @@
 from .api import (
     AbstractText,
     Article,
-    Author,
-    Heading,
     Journal,
-    Qualifier,
     ensure_baselines,
     ensure_updates,
     iterate_ensure_articles,
@@ -19,7 +16,7 @@ from .api import (
     process_baselines,
     process_updates,
 )
-from .constants import ISSN
+from .utils import ISSN, Author, Heading, Qualifier
 
 __all__ = [
     "ISSN",
