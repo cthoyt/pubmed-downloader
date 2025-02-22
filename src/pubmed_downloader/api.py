@@ -128,6 +128,10 @@ class Article(BaseModel):
     abstract: list[AbstractText] = Field(default_factory=list)
     authors: list[Author]
 
+    def get_abstract(self) -> str:
+        """Get the full abstract."""
+        return " ".join(a.text for a in self.abstract)
+
 
 def _get_urls(url: str) -> list[str]:
     res = requests.get(url, timeout=300)
