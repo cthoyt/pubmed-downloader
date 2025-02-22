@@ -23,6 +23,7 @@ from .api import (
 )
 
 __all__ = [
+    "ISSN",
     "AbstractText",
     "Article",
     "Author",

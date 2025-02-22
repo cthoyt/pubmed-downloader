@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import gzip
 import itertools as itt
 import json
@@ -16,6 +17,15 @@ from tqdm.contrib.concurrent import thread_map
 
 from pubmed_downloader.constants import ISSN, MODULE
 
+__all__ = [
+    "ensure_catalog_provider_links",
+    "ensure_catfile_catalog",
+    "ensure_journal_overview",
+    "ensure_serfile_catalog",
+    "process_catalog_provider_links",
+    "process_journal_overview",
+]
+
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
 JOURNAL_INFO_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/jourcache.xml"
 J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
@@ -26,6 +36,8 @@ CATALOG_SERFILE_MODULE = MODULE.module("catalog-serfile")
 
 
 class Journal(BaseModel):
+    """Represents a journal (a subset of NLM Catalog Records)."""
+
     id: int
     nlm_catalog_id: str = Field(
         ...,
@@ -55,18 +67,32 @@ REMAPPING = {
 }
 
 
-def get_journal_overview(*, force: bool = False, include_entrez: bool = True) -> list[Journal]:
+def process_journal_overview(*, force: bool = False, include_entrez: bool = True) -> list[Journal]:
     """Get the list of journals appearing in PubMed/MEDLINE.
 
     :param force: Should the data be re-downloaded?
-    :param include_entrez: If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
+    :param include_entrez:
+        If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
         both the PubMed/MEDLINE and NCBI molecular biology database journals.
+    :returns: A list of journal objects parsed from the overview file
+    """
+    path = ensure_journal_overview(force=force, include_entrez=include_entrez)
+    return list(_parse_journals(path))
+
+
+def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True) -> Path:
+    """Ensure the journal overview file is downloaded.
+
+    :param force: Should the data be re-downloaded?
+    :param include_entrez:
+        If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
+        both the PubMed/MEDLINE and NCBI molecular biology database journals.
+    :returns: A path to the journal overview file
     """
     if include_entrez:
-        path = MODULE.ensure(url=J_ENTREZ_PATH, force=force)
+        return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
     else:
-        path = MODULE.ensure(url=J_MEDLINE_PATH, force=force)
-    return list(_parse_journals(path))
+        return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
 
 
 def _parse_journals(path: Path) -> Iterable[Journal]:
@@ -92,38 +118,44 @@ def _parse_journals(path: Path) -> Iterable[Journal]:
             yield Journal.model_validate(data)
 
 
-class JournalProviderLink(BaseModel):
+class CatalogProviderLink(BaseModel):
+    """Represents a link between a NLM Catalog record and its provider."""
+
     nlm_catalog_id: str
     key: str = Field(..., description="Key for the NLM provider, corresponding to ")
     label: str
 
 
-def get_journal_provider_links(*, force: bool = False) -> list[JournalProviderLink]:
-    df = MODULE.ensure_csv(
-        url=CATALOG_TO_PUBLISHER,
-        force=force,
-        read_csv_kwargs={"sep": "|", "dtype": str, "header": None},
-    )
-    return [
-        JournalProviderLink(nlm_catalog_id=nlm_catalog_id, key=key, label=name)
-        for nlm_catalog_id, key, name in df.values
-    ]
+def process_catalog_provider_links(*, force: bool = False) -> list[CatalogProviderLink]:
+    """Ensure and process catalog record - provider links file."""
+    path = ensure_catalog_provider_links(force=force)
+    with path.open() as file:
+        return [
+            CatalogProviderLink(nlm_catalog_id=nlm_catalog_id, key=key, label=name)
+            for nlm_catalog_id, key, name in csv.reader(file, delimiter="|")
+        ]
 
 
-def _iterate_journals(*, force: bool = False) -> Iterable[Term]:
-    """Get NLM Catalog terms."""
-    get_journal_overview(force=force)
-    get_journal_provider_links(force=force)
+def ensure_catalog_provider_links(*, force: bool = False) -> Path:
+    """Ensure the xmlprovidernames.txt file is downloaded."""
+    return MODULE.ensure(url=CATALOG_TO_PUBLISHER, force=force)
+
+
+def _iterate_journals(*, force: bool = False) -> Iterable[Journal]:
+    process_journal_overview(force=force)
+    process_catalog_provider_links(force=force)
 
     path = MODULE.ensure(url=JOURNAL_INFO_PATH, force=force)
     root = etree.parse(path).getroot()  # noqa:S320
 
     elements = root.findall("Journal")
     for element in elements:
-        yield _process_journal(element)
+        journal = _process_journal(element)
+        if journal:
+            yield journal
 
 
-def _process_journal(element: Element):
+def _process_journal(element: Element) -> Journal | None:
     jrid = element.attrib["jrid"]
 
     nlm_catalog_id = element.findtext("NlmUniqueID")
@@ -139,14 +171,14 @@ def _process_journal(element: Element):
             active = True
         case _ as v:
             raise ValueError(f"unknown activity value: {v}")
-    [alias_tag.text for alias_tag in element.findall("Alias")]
+    synonyms = [alias_tag.text for alias_tag in element.findall("Alias")]
     if start_year := element.findtext("StartYear"):
         if len(start_year) != 4:
-            tqdm.write(f"[{term.curie}] invalid start year: {start_year}")
+            tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
             start_year = None
     if end_year := element.findtext("EndYear"):
         if len(end_year) != 4:
-            tqdm.write(f"[{term.curie}] invalid end year: {end_year}")
+            tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
             end_year = None
 
     # TODO abbreviations?
@@ -158,20 +190,23 @@ def _process_journal(element: Element):
         start_year=start_year,
         end_year=end_year,
         issns=issns,
+        synonyms=synonyms,
     )
 
 
 class CatalogRecord(BaseModel):
-    pass
+    """Represents a record in the NLM Catalog."""
 
 
 def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
+    """Ensure and process the NLM Catalog."""
     return list(iterate_process_catalog(force=force, force_process=force_process))
 
 
 def iterate_process_catalog(
     *, force: bool = False, force_process: bool = False
 ) -> Iterable[CatalogRecord]:
+    """Iterate over records in the NLM Catalog."""
     for path in _iter_catfile_catalog(force=force):
         yield from _parse_catalog(path, force_process=force_process or force)
 
