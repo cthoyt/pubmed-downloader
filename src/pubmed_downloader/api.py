@@ -9,10 +9,8 @@ import json
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
 from xml.etree.ElementTree import Element
 
-import pystow
 import requests
 from bs4 import BeautifulSoup
 from lxml import etree
@@ -21,8 +19,9 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
+from pubmed_downloader.constants import ISSN, MODULE
+
 __all__ = [
-    "ISSN",
     "AbstractText",
     "Article",
     "Author",
@@ -46,10 +45,8 @@ logger = logging.getLogger(__name__)
 BASELINE_URL = "https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/"
 UPDATES_URL = "https://ftp.ncbi.nlm.nih.gov/pubmed/updatefiles/"
 
-MODULE = pystow.module("pubmed")
 BASELINE_MODULE = MODULE.module("baseline")
 UPDATES_MODULE = MODULE.module("updates")
-PARSED = MODULE.join(name="processed.json")
 
 
 def _download_baseline(url: str) -> Path:
@@ -58,13 +55,6 @@ def _download_baseline(url: str) -> Path:
 
 def _download_updates(url: str) -> Path:
     return UPDATES_MODULE.ensure(url=url)
-
-
-class ISSN(BaseModel):
-    """Represents an ISSSN number, annotated with its type."""
-
-    value: str
-    type: Literal["Print", "Electronic"]
 
 
 class Qualifier(BaseModel):

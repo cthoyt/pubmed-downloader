@@ -1,7 +1,8 @@
 """Automate downloading and processing PubMed."""
 
+from pubmed_downloader.constants import ISSN
+
 from .api import (
-    ISSN,
     AbstractText,
     Article,
     Author,
@@ -22,7 +23,6 @@ from .api import (
 )
 
 __all__ = [
-    "ISSN",
     "AbstractText",
     "Article",
     "Author",
