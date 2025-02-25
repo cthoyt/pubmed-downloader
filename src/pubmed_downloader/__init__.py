@@ -1,13 +1,9 @@
 """Automate downloading and processing PubMed."""
 
 from .api import (
-    ISSN,
     AbstractText,
     Article,
-    Author,
-    Heading,
     Journal,
-    Qualifier,
     ensure_baselines,
     ensure_updates,
     iterate_ensure_articles,
@@ -20,16 +16,31 @@ from .api import (
     process_baselines,
     process_updates,
 )
+from .catalog import (
+    CatalogRecord,
+    ensure_catalog_provider_links,
+    ensure_catfile_catalog,
+    ensure_journal_overview,
+    ensure_serfile_catalog,
+    process_catalog,
+    process_journal_overview,
+)
+from .utils import ISSN, Author, Heading, Qualifier
 
 __all__ = [
     "ISSN",
     "AbstractText",
     "Article",
     "Author",
+    "CatalogRecord",
     "Heading",
     "Journal",
     "Qualifier",
     "ensure_baselines",
+    "ensure_catalog_provider_links",
+    "ensure_catfile_catalog",
+    "ensure_journal_overview",
+    "ensure_serfile_catalog",
     "ensure_updates",
     "iterate_ensure_articles",
     "iterate_ensure_baselines",
@@ -39,5 +50,8 @@ __all__ = [
     "iterate_process_updates",
     "process_articles",
     "process_baselines",
+    "process_catalog",
+    "process_catalog_provider_links",
+    "process_journal_overview",
     "process_updates",
 ]

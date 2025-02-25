@@ -49,6 +49,16 @@ for article in pubmed_downloader.iterate_process_articles():
     ...
 ```
 
+The following will automatically download, organize, and structure 600K+ records
+in the NLM Catalog. A subset of these records correspond to journals.
+
+```python
+import pubmed_downloader
+
+for catalog_record in pubmed_downloader.process_catalog():
+    ...
+```
+
 ## 🚀 Installation
 
 The most recent release can be installed from

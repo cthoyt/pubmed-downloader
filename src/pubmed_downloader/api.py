@@ -9,11 +9,10 @@ import json
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
 from xml.etree.ElementTree import Element
 
-import pystow
 import requests
+import ssslm
 from bs4 import BeautifulSoup
 from lxml import etree
 from pydantic import BaseModel, Field
@@ -21,14 +20,22 @@ from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
+from .utils import (
+    ISSN,
+    MODULE,
+    Author,
+    Collective,
+    Heading,
+    _json_default,
+    parse_author,
+    parse_date,
+    parse_mesh_heading,
+)
+
 __all__ = [
-    "ISSN",
     "AbstractText",
     "Article",
-    "Author",
-    "Heading",
     "Journal",
-    "Qualifier",
     "ensure_baselines",
     "ensure_updates",
     "iterate_ensure_articles",
@@ -46,10 +53,8 @@ logger = logging.getLogger(__name__)
 BASELINE_URL = "https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/"
 UPDATES_URL = "https://ftp.ncbi.nlm.nih.gov/pubmed/updatefiles/"
 
-MODULE = pystow.module("pubmed")
 BASELINE_MODULE = MODULE.module("baseline")
 UPDATES_MODULE = MODULE.module("updates")
-PARSED = MODULE.join(name="processed.json")
 
 
 def _download_baseline(url: str) -> Path:
@@ -60,30 +65,8 @@ def _download_updates(url: str) -> Path:
     return UPDATES_MODULE.ensure(url=url)
 
 
-class ISSN(BaseModel):
-    """Represents an ISSSN number, annotated with its type."""
-
-    value: str
-    type: Literal["Print", "Electronic"]
-
-
-class Qualifier(BaseModel):
-    """Represents a MeSH qualifier."""
-
-    mesh: str
-    major: bool = False
-
-
-class Heading(BaseModel):
-    """Represents a MeSH heading annnotation."""
-
-    descriptor: str
-    major: bool = False
-    qualifiers: list[Qualifier] | None = None
-
-
 class Journal(BaseModel):
-    """Represents a refernece to a journal.
+    """Represents a reference to a journal.
 
     Note, full information about a journal can be loaded elsewhere.
     """
@@ -103,16 +86,6 @@ class AbstractText(BaseModel):
     category: str | None = None
 
 
-class Author(BaseModel):
-    """Represents an author."""
-
-    valid: bool = True
-    affiliations: list[str] = Field(default_factory=list)
-    # must have at least one of name/orcid
-    name: str | None = None
-    orcid: str | None = None
-
-
 class Article(BaseModel):
     """Represents an article."""
 
@@ -126,7 +99,7 @@ class Article(BaseModel):
     headings: list[Heading] = Field(default_factory=list)
     journal: Journal
     abstract: list[AbstractText] = Field(default_factory=list)
-    authors: list[Author]
+    authors: list[Author | Collective]
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -147,7 +120,9 @@ def _get_urls(url: str) -> list[str]:
     )
 
 
-def _parse_from_path(path: Path) -> Iterable[Article]:
+def _parse_from_path(
+    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+) -> Iterable[Article]:
     try:
         tree = etree.parse(path)  # noqa:S320
     except etree.XMLSyntaxError:
@@ -155,12 +130,16 @@ def _parse_from_path(path: Path) -> Iterable[Article]:
         return
 
     for pubmed_article in tree.findall("PubmedArticle"):
-        article = _extract_article(pubmed_article)
+        article = _extract_article(
+            pubmed_article, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+        )
         if article:
             yield article
 
 
-def _extract_article(element: Element) -> Article | None:  # noqa:C901
+def _extract_article(  # noqa:C901
+    element: Element, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
         raise ValueError
@@ -188,15 +167,17 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
     if pubmed_data is None:
         raise ValueError
 
-    date_completed = _parse_date(medline_citation.find("DateCompleted"))
-    date_revised = _parse_date(medline_citation.find("DateRevised"))
+    date_completed = parse_date(medline_citation.find("DateCompleted"))
+    date_revised = parse_date(medline_citation.find("DateRevised"))
 
     types = sorted(
         x.attrib["UI"] for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
     )
 
     headings = [
-        _parse_mesh_heading(x) for x in medline_citation.findall(".//MeshHeadingList/MeshHeading")
+        heading
+        for x in medline_citation.findall(".//MeshHeadingList/MeshHeading")
+        if (heading := parse_mesh_heading(x, mesh_grounder=mesh_grounder))
     ]
 
     issns = [
@@ -228,8 +209,8 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
 
     authors = [
         author
-        for x in medline_citation.findall(".//AuthorList/Author")
-        if (author := _parse_author(pubmed, x))
+        for i, x in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
+        if (author := parse_author(i, x, ror_grounder=ror_grounder))
     ]
 
     return Article(
@@ -243,152 +224,6 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
         abstract=abstract,
         authors=authors,
     )
-
-
-def _parse_yn(s: str) -> bool:
-    match s:
-        case "Y":
-            return True
-        case "N":
-            return False
-        case _:
-            raise ValueError(s)
-
-
-ORCID_PREFIXES = [
-    "https://orcid.org/",
-    "http://orcid.org/",
-    "https//orcid.org/",
-    "https/orcid.org/",
-    "http//orcid.org/",
-    "http/orcid.org/",
-    "orcid.org/",
-    "https://orcid.org",
-    "https://orcid.org-",
-    "http://orcid/",
-    "https://orcid.org ",
-    "https://www.orcid.org/",
-]
-
-
-def _clean_orcid(s: str) -> str | None:
-    for p in ORCID_PREFIXES:
-        if s.startswith(p):
-            return s[len(p) :]
-    if len(s) == 19:
-        return s
-    elif len(s) == 18:
-        # malformed, someone forgot the last value
-        return None
-    elif len(s) == 16 and s.isnumeric():
-        # malformed, forgot dashes
-        return f"{s[:4]}-{s[4:8]}-{s[8:12]}-{s[12:]}"
-    elif len(s) == 17 and s.startswith("s") and s[1:].isnumeric():
-        return f"{s[1:5]}-{s[5:9]}-{s[9:13]}-{s[13:]}"
-    elif len(s) == 20:
-        # extra character got OCR'd, mostly from linking to affiliations
-        return s[:20]
-    else:
-        logger.warning(f"unhandled ORCID: {s}")
-        return None
-
-
-def _parse_author(pubmed: int, tag: Element) -> Author | None:  # noqa:C901
-    affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
-    valid = _parse_yn(tag.attrib["ValidYN"])
-
-    orcid = None
-    for it in tag.findall("Identifier"):
-        source = it.attrib.get("Source")
-        if source != "ORCID":
-            logger.warning("unhandled identifier source: %s", source)
-        elif not it.text:
-            continue
-        else:
-            orcid = _clean_orcid(it.text)
-            if not orcid:
-                logger.warning(f"unhandled ORCID: {it.text}")
-
-    last_name_tag = tag.find("LastName")
-    forename_tag = tag.find("ForeName")
-    initials_tag = tag.find("Initials")
-    collective_name_tag = tag.find("CollectiveName")
-
-    if collective_name_tag is not None:
-        logger.debug(f"[pubmed:{pubmed}] skipping collective name: %s", collective_name_tag.text)
-        return None
-
-    if last_name_tag is None:
-        if orcid is not None:
-            return Author(
-                valid=valid,
-                affiliations=affiliations,
-                orcid=orcid,
-            )
-        remainder = {
-            subtag.tag
-            for subtag in tag
-            if subtag.tag not in {"LastName", "ForeName", "Initials", "AffiliationInfo"}
-        }
-        logger.warning(f"no last name given in {tag}. Other tags to check: {remainder}")
-        return None
-
-    if forename_tag is not None:
-        name = f"{forename_tag.text} {last_name_tag.text}"
-    elif initials_tag is not None:
-        name = f"{initials_tag.text} {last_name_tag.text}"
-    else:
-        if orcid is not None:
-            return Author(
-                valid=valid,
-                affiliations=affiliations,
-                orcid=orcid,
-            )
-        remainder = {
-            subtag.tag
-            for subtag in tag
-            if subtag.tag not in {"LastName", "ForeName", "Initials", "AffiliationInfo"}
-        }
-        # TOO can come back to this and do more debugging
-        logger.debug(
-            f"[pubmed:{pubmed}] no forename given in {tag} w/ last name {last_name_tag.text}. "
-            f"Other tags to check: {remainder}"
-        )
-        return None
-
-    return Author(
-        valid=_parse_yn(tag.attrib["ValidYN"]),
-        name=name,
-        affiliations=affiliations,
-        orcid=orcid,
-    )
-
-
-def _parse_mesh_heading(tag: Element) -> Heading | None:
-    descriptor = tag.find("DescriptorName")
-    if descriptor is None:
-        return None
-    mesh_id = descriptor.attrib["UI"]
-    major = _parse_yn(descriptor.attrib["MajorTopicYN"])
-    qualifiers = [
-        Qualifier(mesh=qualifier.attrib["UI"], major=_parse_yn(qualifier.attrib["MajorTopicYN"]))
-        for qualifier in tag.findall("QualifierName")
-    ]
-    return Heading(descriptor=mesh_id, major=major, qualifiers=qualifiers or None)
-
-
-def _parse_date(date_tag: Element | None) -> datetime.date | None:
-    if date_tag is None:
-        return None
-    year_tag = date_tag.find("Year")
-    if year_tag is None or not year_tag.text:
-        return None
-    year = int(year_tag.text)
-    month_tag = date_tag.find("Month")
-    month = int(month_tag.text) if month_tag is not None and month_tag.text else None
-    day_tag = date_tag.find("Day")
-    day = int(day_tag.text) if day_tag is not None and day_tag.text else None
-    return datetime.date(year=year, month=month, day=day)  # type:ignore
 
 
 def ensure_baselines() -> list[Path]:
@@ -414,8 +249,14 @@ def process_baselines() -> list[Article]:
 def iterate_process_baselines() -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines()
+
+    import pyobo
+
+    ror_grounder = pyobo.get_grounder("ror")
+    mesh_grounder = pyobo.get_grounder("ror")
+
     return itt.chain.from_iterable(
-        _process_xml_gz(path)
+        _process_xml_gz(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
         for path in tqdm(paths, unit_scale=True, unit="baseline", desc="Processing baselines")
     )
 
@@ -443,8 +284,14 @@ def process_updates() -> list[Article]:
 def iterate_process_updates() -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates()
+
+    import pyobo
+
+    ror_grounder = pyobo.get_grounder("ror")
+    mesh_grounder = pyobo.get_grounder("mesh")
+
     return itt.chain.from_iterable(
-        _process_xml_gz(path)
+        _process_xml_gz(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
         for path in tqdm(paths, unit_scale=True, unit="update", desc="Processing updates")
     )
 
@@ -466,7 +313,9 @@ def iterate_ensure_articles() -> Iterable[Path]:
     yield from iterate_ensure_baselines()
 
 
-def _process_xml_gz(path: Path) -> Iterable[Article]:
+def _process_xml_gz(
+    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
     new_name = path.stem.removesuffix(".xml")
     new_path = path.with_stem(new_name).with_suffix(".json.gz")
@@ -477,16 +326,12 @@ def _process_xml_gz(path: Path) -> Iterable[Article]:
 
     else:
         with logging_redirect_tqdm():
-            models = list(_parse_from_path(path))
+            models = list(
+                _parse_from_path(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
+            )
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
         with gzip.open(new_path, mode="wt") as file:
-            json.dump(
-                processed,
-                file,
-                default=lambda o: o.isoformat()
-                if isinstance(o, datetime.date | datetime.datetime)
-                else o,
-            )
+            json.dump(processed, file, default=_json_default)
 
         yield from models
