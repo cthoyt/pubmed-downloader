@@ -103,6 +103,8 @@ def parse_author(  # noqa:C901
         source = it.attrib.get("Source")
         if any(it.text.startswith(uri_prefix) for uri_prefix in STARTS):
             pass
+        elif source == "FrPBN":
+            pass  # this only happens once FrPBN:17723227, no context available
         elif source != "ORCID":
             logger.warning("unhandled identifier source: %s - %s (%s)", source, it.text, it.attrib)
         else:
@@ -196,51 +198,66 @@ class Heading(BaseModel):
 MESH_MISSES: set[str] = set()
 
 
-def parse_mesh_heading(tag: Element, *, mesh_grounder: ssslm.Grounder) -> Heading | None:
+def parse_mesh_heading(
+    mesh_heading_tag: Element, *, mesh_grounder: ssslm.Grounder
+) -> Heading | None:
     """Parse a MeSH heading."""
-    descriptor_name_tag = tag.find("DescriptorName")
+    descriptor_name_tag = mesh_heading_tag.find("DescriptorName")
     if descriptor_name_tag is None:
         return None
 
-    name = descriptor_name_tag.text
-    mesh_id = _get_mesh_id(descriptor_name_tag)
-    if not name and not mesh_id:
-        return None
+    descriptor_name = descriptor_name_tag.text
+    descriptor_mesh_id = _get_mesh_id(descriptor_name_tag, mesh_heading_tag=mesh_heading_tag)
 
-    if name and not mesh_id:
-        match = mesh_grounder.get_best_match(name.rstrip("."))
-        if match:
-            mesh_id = match.identifier
+    if not descriptor_name and not descriptor_mesh_id:
+        return None
+    elif descriptor_name and not descriptor_mesh_id:
+        best_match = mesh_grounder.get_best_match(descriptor_name.rstrip("."))
+        if best_match is not None:
+            descriptor_mesh_id = best_match.identifier
         else:
-            if name not in MESH_MISSES:
-                tqdm.write(f"could not ground mesh descriptor: {name}")
-                MESH_MISSES.add(name)
+            if descriptor_name not in MESH_MISSES:
+                tqdm.write(f"could not ground mesh descriptor: {descriptor_name}")
+                MESH_MISSES.add(descriptor_name)
             return None
+    elif descriptor_mesh_id and not descriptor_name:
+        raise NotImplementedError("need to lookup descriptor MeSH name automatically")
+    # else, name and MeSH ID both available, and all good to continue
 
     major = _parse_yn(descriptor_name_tag.attrib["MajorTopicYN"])
     qualifiers = []
-    for qualifier_tag in tag.findall("QualifierName"):
-        mesh_id = qualifier_tag.attrib.get("UI")
+    # FIXME is this supposed to look in tag or descriptor_name_tag
+    for qualifier_tag in mesh_heading_tag.findall("QualifierName"):
+        qualifier_mesh_id = qualifier_tag.attrib.get("UI")
         qualifiers.append(
             Qualifier(
                 name=qualifier_tag.text,
-                mesh_id=mesh_id,
+                mesh_id=qualifier_mesh_id,
                 major=_parse_yn(qualifier_tag.attrib["MajorTopicYN"]),
             )
         )
+
     return Heading(
-        descriptor_mesh_id=mesh_id, name=name, major=major, qualifiers=qualifiers or None
+        descriptor_mesh_id=descriptor_mesh_id,
+        name=descriptor_name,
+        major=major,
+        qualifiers=qualifiers or None,
     )
 
 
-def _get_mesh_id(descriptor_name_tag: Element) -> str | None:
+MESH_RDF_URI_PREFIX = "https://id.nlm.nih.gov/mesh/"
+
+
+def _get_mesh_id(
+    descriptor_name_tag: Element, mesh_heading_tag: Element | None = None
+) -> str | None:
     if "UI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["UI"].removeprefix("https://id.nlm.nih.gov/mesh/")
-    elif "URI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["URI"].removeprefix("https://id.nlm.nih.gov/mesh/")
-    else:
-        # TODO could do grounding here, but this isn't great
-        return None
+        return descriptor_name_tag.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
+    if "URI" in descriptor_name_tag.attrib:
+        return descriptor_name_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    if mesh_heading_tag is not None and "URI" in mesh_heading_tag.attrib:
+        return mesh_heading_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    return None
 
 
 def _parse_yn(s: str) -> bool:

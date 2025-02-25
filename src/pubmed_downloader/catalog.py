@@ -9,7 +9,7 @@ import itertools as itt
 import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 from xml.etree.ElementTree import Element
 
 import click
@@ -250,11 +250,32 @@ class Language(BaseModel):
     type: str
 
 
+class TitleAlternative(BaseModel):
+    text: str
+    source: str
+    type: str
+    sort: Literal["N"] | int
+
+
+class TitleRelated(BaseModel):
+    text: str
+    source: str
+    type: str
+    sort: Literal["N"] | int
+
+    issns: list[ISSN] = Field(default_factory=list)
+    xrefs: list[Reference] = Field(default_factory=list)
+
+
 class CatalogRecord(BaseModel):
     """Represents a record in the NLM Catalog."""
 
     nlm_catalog_id: str
     title: str
+    title_sort: Literal["N"] | int
+    medline_short_title: str | None = None
+    title_alternatives: list[TitleAlternative] = Field(default_factory=list)
+    title_relatives: list[TitleRelated] = Field(default_factory=list)
     publication_type_mesh_ids: list[str] = Field(default_factory=list)
     mesh_headings: list[Heading] = Field(default_factory=list)
     date_created: datetime.date | None = None
@@ -289,6 +310,71 @@ def _process_elocation_tag(elt: Element) -> str | None:
     return elt.text
 
 
+def _extract_alts(tag: Element) -> list[TitleAlternative]:
+    # <TitleAlternate Owner="NLM" TitleType="Other">
+    #     <Title Sort="N">Physiology, biochemistry and pharmacology</Title>
+    # </TitleAlternate>
+    rv = []
+    for outer_tag in tag.findall("TitleAlternate"):
+        inner_tag = outer_tag.find("Title")
+        if inner_tag is None:
+            continue
+
+        title_type = outer_tag.attrib["TitleType"]
+        title_source = outer_tag.attrib["Owner"]
+        title_text = inner_tag.text
+        title_sort = inner_tag.attrib["Sort"]
+
+        rv.append(
+            TitleAlternative(
+                text=title_text,
+                source=title_source,
+                type=title_type,
+                sort=title_sort,
+            )
+        )
+    return rv
+
+
+def _extract_rels(tag: Element) -> list[TitleRelated]:
+    # <TitleRelated Owner="NLM" TitleType="SucceedingInPart">
+    #     <Title Sort="N">Excerpta medica. Section 2B. Biochemistry</Title>
+    #     <RecordID Source="LC">65009896</RecordID>
+    #     <RecordID Source="OCLC">1778955</RecordID>
+    #     <ISSN IssnType="Undetermined">0169-8028</ISSN>
+    # </TitleRelated>
+    rv = []
+    for outer_tag in tag.findall("TitleRelated"):
+        inner_tag = outer_tag.find("Title")
+        if inner_tag is None:
+            continue
+
+        title_type = outer_tag.attrib["TitleType"]
+        title_source = outer_tag.attrib["Owner"]
+        title_text = inner_tag.text
+        title_sort = inner_tag.attrib["Sort"]
+
+        issns = [
+            ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
+            for issn_tag in outer_tag.findall("ISSN")
+        ]
+        xrefs = [
+            Reference(prefix=t.attrib["Source"], identifier=t.text)
+            for t in outer_tag.findall("RecordID")
+        ]
+        rv.append(
+            TitleRelated(
+                text=title_text,
+                source=title_source,
+                type=title_type,
+                sort=title_sort,
+                issns=issns,
+                xrefs=xrefs,
+            )
+        )
+    return rv
+
+
 def _extract_catalog_record(  # noqa:C901
     tag: Element, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
 ) -> CatalogRecord | None:
@@ -308,8 +394,11 @@ def _extract_catalog_record(  # noqa:C901
         tqdm.write(f"[{nlm_catalog_id}] no title text")
         return None
 
-    # TODO TitleAlternate
-    # TODO TitleRelated
+    title_sort = title_tag.attrib["Sort"]
+
+    alts = _extract_alts(tag)
+    rels = _extract_rels(tag)
+
     # TODO PhysicalDescription
 
     # <ELocationList>
@@ -404,6 +493,10 @@ def _extract_catalog_record(  # noqa:C901
     return CatalogRecord(
         nlm_catalog_id=nlm_catalog_id,
         title=title.rstrip("."),
+        title_sort=title_sort,
+        title_alternatives=alts,
+        title_relatives=rels,
+        medline_short_title=tag.findtext("MedlineTA"),
         publication_type_mesh_ids=publication_type_mesh_ids,
         mesh_headings=mesh_headings,
         date_created=parse_date(tag.find("DateCreated")),
@@ -476,12 +569,16 @@ CONTENT_TYPE_REPLACE = {"Text": "text", None: "unspecified"}
 MEDIA_TYPE_REPLACE: dict[str | None, str] = {
     "Computermedien": "computer",
     "informàtic": "unspecified",
+    "unmmediated": "unmediated",  # typo
 }
 CARRIER_TYPE_REPLACE = {
     None: "unspecified",
     "Online-Ressource": "online resource",
     "online": "online resource",
     "other": "unspecified",
+    "videocassette": "video cassette",
+    "audiocassette": "audio cassette",
+    "videodisc": "video disc",
 }
 
 
