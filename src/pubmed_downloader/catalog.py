@@ -222,12 +222,16 @@ def _process_journal(element: Element) -> Journal | None:
 
 
 class Resource(BaseModel):
+    """Represents a resource annotation to a resource info annotation."""
+
     content_type: str
     media_type: str
     carrier_type: str
 
 
 class ResourceInfo(BaseModel):
+    """Represents a resource info annotation to a catalog record."""
+
     type: str
     # issuance only ever has one value: "continuing"
     issuance: str
@@ -236,6 +240,8 @@ class ResourceInfo(BaseModel):
 
 
 class Imprint(BaseModel):
+    """Represents an imprint, which is like a brand for a publisher."""
+
     type: str | None = None
     function_type: str | None = None
     place: str | None = None
@@ -243,6 +249,8 @@ class Imprint(BaseModel):
 
 
 class Language(BaseModel):
+    """Represents a language and its usage annotation."""
+
     # TODO is this supposed to be standardized with ISO 3-letter?
     value: str
     # this doesn't really make sense, it's one of Primary, Summary,
@@ -251,6 +259,8 @@ class Language(BaseModel):
 
 
 class TitleAlternative(BaseModel):
+    """Represents an alternative title."""
+
     text: str
     source: str
     type: str
@@ -258,6 +268,8 @@ class TitleAlternative(BaseModel):
 
 
 class TitleRelated(BaseModel):
+    """Represents a related title."""
+
     text: str
     source: str
     type: str
