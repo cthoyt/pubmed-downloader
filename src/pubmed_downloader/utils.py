@@ -8,7 +8,10 @@ from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
 import pystow
+import ssslm
+from curies import NamableReference
 from pydantic import BaseModel, Field
+from tqdm import tqdm
 
 __all__ = [
     "MODULE",
@@ -59,6 +62,7 @@ def parse_date(date_tag: Element | None) -> datetime.date | None:
 class Author(BaseModel):
     """Represents an author."""
 
+    position: int
     valid: bool = True
     affiliations: list[str] = Field(default_factory=list)
     # must have at least one of name/orcid
@@ -70,7 +74,9 @@ class Author(BaseModel):
 class Collective(BaseModel):
     """Represents an author."""
 
+    position: int
     name: str
+    reference: NamableReference | None = None
     roles: list[str] = Field(default_factory=list)
 
 
@@ -83,7 +89,9 @@ STARTS = (
 )
 
 
-def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collective | None:  # noqa:C901
+def parse_author(  # noqa:C901
+    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder
+) -> Author | Collective | None:
     """Parse an author XML object."""
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
     valid = _parse_yn(tag.attrib["ValidYN"]) if "ValidYN" in tag.attrib else True
@@ -110,11 +118,16 @@ def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collec
     roles = [role_tag.text for role_tag in tag.findall("Role")]
 
     if collective_name_tag is not None and collective_name_tag.text:
-        return Collective(name=collective_name_tag.text.rstrip("."), roles=roles)
+        name = collective_name_tag.text.rstrip(".")
+        match = ror_grounder.get_best_match(name)
+        return Collective(
+            position=position, name=name, reference=match.reference if match else None, roles=roles
+        )
 
     if last_name_tag is None:
         if orcid is not None:
             return Author(
+                position=position,
                 valid=valid,
                 affiliations=affiliations,
                 orcid=orcid,
@@ -135,6 +148,7 @@ def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collec
     else:
         if orcid is not None:
             return Author(
+                position=position,
                 valid=valid,
                 affiliations=affiliations,
                 orcid=orcid,
@@ -153,6 +167,7 @@ def parse_author(tag: Element, *, doc_key: int | None = None) -> Author | Collec
         return None
 
     return Author(
+        position=position,
         valid=valid,
         name=name,
         affiliations=affiliations,
@@ -165,7 +180,7 @@ class Qualifier(BaseModel):
     """Represents a MeSH qualifier."""
 
     name: str
-    mesh_id: str | None
+    mesh_id: str | None = None
     major: bool = False
 
 
@@ -173,12 +188,15 @@ class Heading(BaseModel):
     """Represents a MeSH heading annnotation."""
 
     name: str
-    descriptor_mesh_id: str | None
+    descriptor_mesh_id: str
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
 
-def parse_mesh_heading(tag: Element) -> Heading | None:
+MESH_MISSES: set[str] = set()
+
+
+def parse_mesh_heading(tag: Element, *, mesh_grounder: ssslm.Grounder) -> Heading | None:
     """Parse a MeSH heading."""
     descriptor_name_tag = tag.find("DescriptorName")
     if descriptor_name_tag is None:
@@ -188,6 +206,16 @@ def parse_mesh_heading(tag: Element) -> Heading | None:
     mesh_id = _get_mesh_id(descriptor_name_tag)
     if not name and not mesh_id:
         return None
+
+    if name and not mesh_id:
+        match = mesh_grounder.get_best_match(name.rstrip("."))
+        if match:
+            mesh_id = match.identifier
+        else:
+            if name not in MESH_MISSES:
+                tqdm.write(f"could not ground mesh descriptor: {name}")
+                MESH_MISSES.add(name)
+            return None
 
     major = _parse_yn(descriptor_name_tag.attrib["MajorTopicYN"])
     qualifiers = []

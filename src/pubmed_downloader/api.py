@@ -12,6 +12,7 @@ from pathlib import Path
 from xml.etree.ElementTree import Element
 
 import requests
+import ssslm
 from bs4 import BeautifulSoup
 from lxml import etree
 from pydantic import BaseModel, Field
@@ -65,7 +66,7 @@ def _download_updates(url: str) -> Path:
 
 
 class Journal(BaseModel):
-    """Represents a refernece to a journal.
+    """Represents a reference to a journal.
 
     Note, full information about a journal can be loaded elsewhere.
     """
@@ -119,7 +120,9 @@ def _get_urls(url: str) -> list[str]:
     )
 
 
-def _parse_from_path(path: Path) -> Iterable[Article]:
+def _parse_from_path(
+    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+) -> Iterable[Article]:
     try:
         tree = etree.parse(path)  # noqa:S320
     except etree.XMLSyntaxError:
@@ -127,12 +130,16 @@ def _parse_from_path(path: Path) -> Iterable[Article]:
         return
 
     for pubmed_article in tree.findall("PubmedArticle"):
-        article = _extract_article(pubmed_article)
+        article = _extract_article(
+            pubmed_article, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+        )
         if article:
             yield article
 
 
-def _extract_article(element: Element) -> Article | None:  # noqa:C901
+def _extract_article(  # noqa:C901
+    element: Element, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
         raise ValueError
@@ -170,7 +177,7 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
     headings = [
         heading
         for x in medline_citation.findall(".//MeshHeadingList/MeshHeading")
-        if (heading := parse_mesh_heading(x))
+        if (heading := parse_mesh_heading(x, mesh_grounder=mesh_grounder))
     ]
 
     issns = [
@@ -202,8 +209,8 @@ def _extract_article(element: Element) -> Article | None:  # noqa:C901
 
     authors = [
         author
-        for x in medline_citation.findall(".//AuthorList/Author")
-        if (author := parse_author(x))
+        for i, x in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
+        if (author := parse_author(i, x, ror_grounder=ror_grounder))
     ]
 
     return Article(
@@ -242,8 +249,14 @@ def process_baselines() -> list[Article]:
 def iterate_process_baselines() -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines()
+
+    import pyobo
+
+    ror_grounder = pyobo.get_grounder("ror")
+    mesh_grounder = pyobo.get_grounder("ror")
+
     return itt.chain.from_iterable(
-        _process_xml_gz(path)
+        _process_xml_gz(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
         for path in tqdm(paths, unit_scale=True, unit="baseline", desc="Processing baselines")
     )
 
@@ -271,8 +284,14 @@ def process_updates() -> list[Article]:
 def iterate_process_updates() -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates()
+
+    import pyobo
+
+    ror_grounder = pyobo.get_grounder("ror")
+    mesh_grounder = pyobo.get_grounder("mesh")
+
     return itt.chain.from_iterable(
-        _process_xml_gz(path)
+        _process_xml_gz(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
         for path in tqdm(paths, unit_scale=True, unit="update", desc="Processing updates")
     )
 
@@ -294,7 +313,9 @@ def iterate_ensure_articles() -> Iterable[Path]:
     yield from iterate_ensure_baselines()
 
 
-def _process_xml_gz(path: Path) -> Iterable[Article]:
+def _process_xml_gz(
+    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
     new_name = path.stem.removesuffix(".xml")
     new_path = path.with_stem(new_name).with_suffix(".json.gz")
@@ -305,7 +326,9 @@ def _process_xml_gz(path: Path) -> Iterable[Article]:
 
     else:
         with logging_redirect_tqdm():
-            models = list(_parse_from_path(path))
+            models = list(
+                _parse_from_path(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
+            )
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
         with gzip.open(new_path, mode="wt") as file:

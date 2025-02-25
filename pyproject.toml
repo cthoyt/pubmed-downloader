@@ -59,8 +59,10 @@ dependencies = [
     "beautifulsoup4",
     "pystow",
     "pydantic",
+    "pydantic_extra_types",
     "lxml",
     "curies",
+    "ssslm",
 ]
 
 [project.optional-dependencies]
@@ -73,6 +75,9 @@ docs = [
     "sphinx-rtd-theme>=3.0",
     "sphinx-click",
     "sphinx_automodapi",
+]
+process = [
+    "pyobo",
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
