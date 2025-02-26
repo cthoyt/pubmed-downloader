@@ -86,6 +86,13 @@ class AbstractText(BaseModel):
     category: str | None = None
 
 
+#: aslo see edam:has_topic
+HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
+#: also see biolink:published_in, EFO:0001796
+IN_JOURNAL = Reference(prefix="uniprot.core", identifier="publishedIn")
+CITES = Reference(prefix="cito", identifier="cites")
+
+
 class Article(BaseModel):
     """Represents an article."""
 
@@ -106,6 +113,28 @@ class Article(BaseModel):
     def get_abstract(self) -> str:
         """Get the full abstract."""
         return " ".join(a.text for a in self.abstract)
+
+    def _triples(self) -> Iterable[Triple]:
+        s = Reference(prefix="pubmed", identifier=str(self.pubmed))
+        for p, o in self._pos():
+            yield Triple(s, p, o)
+
+    def _pos(self) -> Iterable[tuple[Reference, Reference]]:
+        for type_mesh_id in self.type_mesh_ids:
+            yield v.rdf_type, Reference(prefix="mesh", identifier=type_mesh_id)
+        for heading in self.headings:
+            yield HAS_TOPIC, Reference(prefix="mesh", identifier=heading.descriptor_mesh_id)
+        yield IN_JOURNAL, Reference(prefix="nlm", identifier=self.journal.nlm_catalog_id)
+        for author in self.authors:
+            match author:
+                case Collective() as collective if collective.reference:
+                    yield v.has_contributor, collective.reference
+                case Author() as author if author.orcid:
+                    yield v.has_contributor, Reference(prefix="orcid", identifier=author.orcid)
+        for pubmed in self.reference_pubmed_ids:
+            yield CITES, Reference(prefix="pubmed", identifier=pubmed)
+        for xref in self.xrefs:
+            yield v.exact_match, xref
 
 
 def _get_urls(url: str) -> list[str]:
