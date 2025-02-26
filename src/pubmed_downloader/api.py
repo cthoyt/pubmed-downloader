@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import gzip
 import itertools as itt
 import json
@@ -11,13 +12,17 @@ from collections.abc import Iterable
 from pathlib import Path
 from xml.etree.ElementTree import Element
 
+import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
+from curies import Reference, Triple
+from curies import vocabulary as v
+from curies.triples import read_triples, write_triples
 from lxml import etree
 from pydantic import BaseModel, Field
 from tqdm import tqdm
-from tqdm.contrib.concurrent import thread_map
+from tqdm.contrib.concurrent import process_map, thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from .utils import (
@@ -55,6 +60,7 @@ UPDATES_URL = "https://ftp.ncbi.nlm.nih.gov/pubmed/updatefiles/"
 
 BASELINE_MODULE = MODULE.module("baseline")
 UPDATES_MODULE = MODULE.module("updates")
+EDGES_PATH = MODULE.join(name="edges.tsv.gz")
 
 
 def _download_baseline(url: str) -> Path:
@@ -292,24 +298,55 @@ def iterate_ensure_baselines() -> Iterable[Path]:
     )
 
 
-def process_baselines() -> list[Article]:
+def process_baselines(*, force_process: bool = False) -> list[Article]:
     """Ensure and process all baseline files."""
-    return list(iterate_process_baselines())
+    return list(iterate_process_baselines(force_process=force_process))
 
 
-def iterate_process_baselines() -> Iterable[Article]:
+def iterate_process_baselines(
+    *,
+    force_process: bool = False,
+    multiprocessing: bool = False,
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
+) -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines()
-
-    import pyobo
-
-    ror_grounder = pyobo.get_grounder("ror")
-    mesh_grounder = pyobo.get_grounder("ror")
-
-    return itt.chain.from_iterable(
-        _process_xml_gz(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
-        for path in tqdm(paths, unit_scale=True, unit="baseline", desc="Processing baselines")
+    return _shared_process(
+        paths=paths,
+        ror_grounder=ror_grounder,
+        mesh_grounder=mesh_grounder,
+        force_process=force_process,
+        multiprocessing=multiprocessing,
+        unit="baseline",
     )
+
+
+def _shared_process(
+    paths: Iterable[Path],
+    *,
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
+    force_process: bool = False,
+    unit: str,
+    multiprocessing: bool = False,
+) -> Iterable[Article]:
+    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+
+    func = functools.partial(
+        _process_xml_gz,
+        ror_grounder=ror_grounder,
+        mesh_grounder=mesh_grounder,
+        force_process=force_process,
+    )
+
+    tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
+    if multiprocessing:
+        xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
+    else:
+        xxx = map(func, tqdm(paths, **tqdm_kwargs))
+
+    return itt.chain.from_iterable(xxx)
 
 
 def ensure_updates() -> list[Path]:
@@ -327,35 +364,78 @@ def iterate_ensure_updates() -> Iterable[Path]:
     )
 
 
-def process_updates() -> list[Article]:
+def process_updates(*, force_process: bool = False) -> list[Article]:
     """Ensure and process updates."""
-    return list(iterate_process_updates())
+    return list(iterate_process_updates(force_process=force_process))
 
 
-def iterate_process_updates() -> Iterable[Article]:
+def _ensure_grounders(
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
+) -> tuple[ssslm.Grounder, ssslm.Grounder]:
+    if ror_grounder is None:
+        import pyobo
+
+        ror_grounder = pyobo.get_grounder("ror")
+
+    if mesh_grounder is None:
+        import pyobo
+
+        mesh_grounder = pyobo.get_grounder("ror")
+
+    return ror_grounder, mesh_grounder
+
+
+def iterate_process_updates(
+    *,
+    force_process: bool = False,
+    multiprocessing: bool = False,
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
+) -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates()
 
-    import pyobo
-
-    ror_grounder = pyobo.get_grounder("ror")
-    mesh_grounder = pyobo.get_grounder("mesh")
-
-    return itt.chain.from_iterable(
-        _process_xml_gz(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
-        for path in tqdm(paths, unit_scale=True, unit="update", desc="Processing updates")
+    return _shared_process(
+        paths=paths,
+        ror_grounder=ror_grounder,
+        mesh_grounder=mesh_grounder,
+        force_process=force_process,
+        multiprocessing=multiprocessing,
+        unit="updates",
     )
 
 
-def process_articles() -> list[Article]:
+def process_articles(
+    *, force_process: bool = False, multiprocessing: bool = False
+) -> list[Article]:
     """Ensure and process articles from baseline, then updates."""
-    return list(iterate_process_articles())
+    return list(
+        iterate_process_articles(force_process=force_process, multiprocessing=multiprocessing)
+    )
 
 
-def iterate_process_articles() -> Iterable[Article]:
+def iterate_process_articles(
+    *,
+    force_process: bool = False,
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
+    multiprocessing: bool = False,
+) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    yield from iterate_process_updates()
-    yield from iterate_process_baselines()
+    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    yield from iterate_process_updates(
+        force_process=force_process,
+        ror_grounder=ror_grounder,
+        mesh_grounder=mesh_grounder,
+        multiprocessing=multiprocessing,
+    )
+    yield from iterate_process_baselines(
+        force_process=force_process,
+        ror_grounder=ror_grounder,
+        mesh_grounder=mesh_grounder,
+        multiprocessing=multiprocessing,
+    )
 
 
 def iterate_ensure_articles() -> Iterable[Path]:
@@ -365,12 +445,34 @@ def iterate_ensure_articles() -> Iterable[Path]:
 
 
 def _process_xml_gz(
-    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    force_process: bool = False,
+) -> Iterable[Article]:
+    """Process an XML file, cache a JSON version, and return it."""
+    return list(
+        _iterate_process_xml_gz(
+            path=path,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            force_process=force_process,
+        )
+    )
+
+
+def _iterate_process_xml_gz(
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
     new_name = path.stem.removesuffix(".xml")
     new_path = path.with_stem(new_name).with_suffix(".json.gz")
-    if new_path.is_file():
+    if new_path.is_file() and not force_process:
         with gzip.open(new_path, mode="rt") as file:
             for part in json.load(file):
                 yield Article.model_validate(part)
@@ -386,3 +488,29 @@ def _process_xml_gz(
             json.dump(processed, file, default=_json_default)
 
         yield from models
+
+
+def get_edges(*, force_process: bool = False) -> list[Triple]:
+    """Get edges from PubMed."""
+    if EDGES_PATH.is_file() and not force_process:
+        return read_triples(EDGES_PATH)
+    rv = list(iterate_edges(force_process=force_process))
+    write_triples(rv, EDGES_PATH)
+    return rv
+
+
+def iterate_edges(*, force_process: bool = False) -> Iterable[Triple]:
+    """Iterate over edges from PubMed."""
+    for article in iterate_process_articles(force_process=force_process):
+        yield from article._triples()
+
+
+@click.command()
+@click.option("-f", "--force-process", is_flag=True)
+@click.option("-m", "--multiprocessing", is_flag=True)
+def _main(force_process: bool, multiprocessing: bool) -> None:
+    process_articles(force_process=force_process, multiprocessing=multiprocessing)
+
+
+if __name__ == "__main__":
+    _main()
