@@ -293,7 +293,7 @@ def _clean_orcid(s: str) -> str | None:
         # extra character got OCR'd, mostly from linking to affiliations
         return s[:20]
     else:
-        logger.warning(f"unhandled ORCID: {s}")
+        logger.debug(f"unhandled ORCID: {s}")
         return None
 
 

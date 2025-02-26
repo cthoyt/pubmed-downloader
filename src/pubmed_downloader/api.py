@@ -235,30 +235,32 @@ def _extract_article(  # noqa:C901
         issns=issns,
     )
 
-    abstract = []
-    for x in medline_citation.findall(".//Abstract/AbstractText"):
-        if not x.text:
+    abstract_texts = []
+    for abstract_text_tag in medline_citation.findall(".//Abstract/AbstractText"):
+        if not abstract_text_tag.text:
             continue
-        t = AbstractText(
-            text=x.text, label=x.attrib.get("Label"), category=x.attrib.get("NlmCategory")
+        abstract_text = AbstractText(
+            text=abstract_text_tag.text,
+            label=abstract_text_tag.attrib.get("Label"),
+            category=abstract_text_tag.attrib.get("NlmCategory"),
         )
-        abstract.append(t)
+        abstract_texts.append(abstract_text)
 
     authors = [
         author
-        for i, x in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
-        if (author := parse_author(i, x, ror_grounder=ror_grounder))
+        for i, author_tag in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
+        if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
     ]
 
     cites_pubmed_ids = [
         cites_pubmed_id
-        for x in medline_citation.findall(".//ReferenceList/Reference")
-        if (cites_pubmed_id := _parse_reference(x))
+        for citation_reference_tag in medline_citation.findall(".//ReferenceList/Reference")
+        if (cites_pubmed_id := _parse_reference(citation_reference_tag))
     ]
 
     xrefs = [
-        Reference(prefix=x.attrib["IdType"], identifier=x.text)
-        for x in medline_citation.findall(".//ArticleIdList/ArticleId")
+        Reference(prefix=article_id_tag.attrib["IdType"], identifier=article_id_tag.text)
+        for article_id_tag in medline_citation.findall(".//ArticleIdList/ArticleId")
     ]
 
     return Article(
@@ -269,7 +271,7 @@ def _extract_article(  # noqa:C901
         type_mesh_ids=types,
         headings=headings,
         journal=journal,
-        abstract=abstract,
+        abstract=abstract_texts,
         authors=authors,
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
