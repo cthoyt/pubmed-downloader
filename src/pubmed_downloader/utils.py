@@ -111,8 +111,6 @@ def parse_author(  # noqa:C901
             logger.warning("unhandled identifier source: %s - %s (%s)", source, it.text, it.attrib)
         else:
             orcid = _clean_orcid(it.text)
-            if not orcid:
-                logger.warning(f"unhandled ORCID: {it.text}")
 
     last_name_tag = tag.find("LastName")
     forename_tag = tag.find("ForeName")

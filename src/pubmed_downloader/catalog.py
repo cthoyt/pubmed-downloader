@@ -744,9 +744,10 @@ def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iter
         yield base + href
 
 
-@click.command()
+@click.command(name="catalog")
 @click.option("-f", "--force-process", is_flag=True)
 def _main(force_process: bool) -> None:
+    """Download and process the NLM catalog."""
     from collections import Counter
 
     from tabulate import tabulate

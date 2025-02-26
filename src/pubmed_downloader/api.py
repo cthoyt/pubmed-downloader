@@ -507,10 +507,11 @@ def iterate_edges(*, force_process: bool = False) -> Iterable[Triple]:
         yield from article._triples()
 
 
-@click.command()
+@click.command(name="articles")
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
 def _main(force_process: bool, multiprocessing: bool) -> None:
+    """Download and process articles."""
     process_articles(force_process=force_process, multiprocessing=multiprocessing)
 
 
