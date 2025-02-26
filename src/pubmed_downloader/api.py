@@ -100,6 +100,8 @@ class Article(BaseModel):
     journal: Journal
     abstract: list[AbstractText] = Field(default_factory=list)
     authors: list[Author | Collective]
+    reference_pubmed_ids: list[str] = Field(default_factory=list)
+    xrefs: list[Reference] = Field(default_factory=list)
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -213,6 +215,17 @@ def _extract_article(  # noqa:C901
         if (author := parse_author(i, x, ror_grounder=ror_grounder))
     ]
 
+    reference_pubmed_ids = [
+        reference_pubmed_id
+        for x in medline_citation.findall(".//ReferenceList/Reference")
+        if (reference_pubmed_id := _parse_reference(x))
+    ]
+
+    xrefs = [
+        Reference(prefix=x.attrib["IdType"], identifier=x.text)
+        for x in medline_citation.findall(".//ArticleIdList/ArticleId")
+    ]
+
     return Article(
         pubmed=pubmed,
         title=title,
@@ -223,7 +236,16 @@ def _extract_article(  # noqa:C901
         journal=journal,
         abstract=abstract,
         authors=authors,
+        xrefs=xrefs,
+        reference_pubmed_ids=reference_pubmed_ids,
     )
+
+
+def _parse_reference(reference_tag: Element) -> str | None:
+    for article_id_tag in reference_tag.findall(".//ArticleIdList/ArticleId"):
+        if article_id_tag.attrib["IdType"] == "pubmed":
+            return article_id_tag.text
+    return None
 
 
 def ensure_baselines() -> list[Path]:
