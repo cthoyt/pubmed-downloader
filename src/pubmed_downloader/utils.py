@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
@@ -34,6 +35,7 @@ ORCID_PREFIXES = [
     "http://orcid/",
     "https://orcid.org ",
     "https://www.orcid.org/",
+    "http://ORCID.org/",
 ]
 
 
@@ -270,6 +272,9 @@ def _parse_yn(s: str) -> bool:
             raise ValueError(s)
 
 
+SPLOOSHED_RE = re.compile(r"^\d{15}(\d|X)$")
+
+
 def _clean_orcid(s: str) -> str | None:
     for p in ORCID_PREFIXES:
         if s.startswith(p):
@@ -279,10 +284,10 @@ def _clean_orcid(s: str) -> str | None:
     elif len(s) == 18:
         # malformed, someone forgot the last value
         return None
-    elif len(s) == 16 and s.isnumeric():
+    elif SPLOOSHED_RE.match(s):
         # malformed, forgot dashes
         return f"{s[:4]}-{s[4:8]}-{s[8:12]}-{s[12:]}"
-    elif len(s) == 17 and s.startswith("s") and s[1:].isnumeric():
+    elif len(s) == 17 and s.startswith("s") and SPLOOSHED_RE.match(s[1:]):
         return f"{s[1:5]}-{s[5:9]}-{s[9:13]}-{s[13:]}"
     elif len(s) == 20:
         # extra character got OCR'd, mostly from linking to affiliations
