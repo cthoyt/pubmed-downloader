@@ -74,7 +74,7 @@ class Journal(BaseModel):
     issn: str | None = Field(
         None, description="The ISSN used for linking, since there might be many"
     )
-    nlm: str = Field(..., description="The NLM identifier for the journal")
+    nlm_catalog_id: str = Field(..., description="The NLM identifier for the journal")
     issns: list[ISSN] = Field(default_factory=list)
 
 
@@ -192,11 +192,11 @@ def _extract_article(  # noqa:C901
         return None
 
     issn_linking = medline_journal.findtext("ISSNLinking")
-    nlm_id = medline_journal.findtext("NlmUniqueID")
+    nlm_catalog_id = medline_journal.findtext("NlmUniqueID")
 
     journal = Journal(
         issn=issn_linking,
-        nlm=nlm_id,
+        nlm_catalog_id=nlm_catalog_id,
         issns=issns,
     )
 
