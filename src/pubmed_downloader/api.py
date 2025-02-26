@@ -113,7 +113,7 @@ class Article(BaseModel):
     journal: Journal
     abstract: list[AbstractText] = Field(default_factory=list)
     authors: list[Author | Collective]
-    reference_pubmed_ids: list[str] = Field(default_factory=list)
+    cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
 
     def get_abstract(self) -> str:
@@ -137,7 +137,7 @@ class Article(BaseModel):
                     yield v.has_contributor, collective.reference
                 case Author() as author if author.orcid:
                     yield v.has_contributor, Reference(prefix="orcid", identifier=author.orcid)
-        for pubmed in self.reference_pubmed_ids:
+        for pubmed in self.cites_pubmed_ids:
             yield CITES, Reference(prefix="pubmed", identifier=pubmed)
         for xref in self.xrefs:
             yield v.exact_match, xref
@@ -250,10 +250,10 @@ def _extract_article(  # noqa:C901
         if (author := parse_author(i, x, ror_grounder=ror_grounder))
     ]
 
-    reference_pubmed_ids = [
-        reference_pubmed_id
+    cites_pubmed_ids = [
+        cites_pubmed_id
         for x in medline_citation.findall(".//ReferenceList/Reference")
-        if (reference_pubmed_id := _parse_reference(x))
+        if (cites_pubmed_id := _parse_reference(x))
     ]
 
     xrefs = [
@@ -272,7 +272,7 @@ def _extract_article(  # noqa:C901
         abstract=abstract,
         authors=authors,
         xrefs=xrefs,
-        reference_pubmed_ids=reference_pubmed_ids,
+        cites_pubmed_ids=cites_pubmed_ids,
     )
 
 
