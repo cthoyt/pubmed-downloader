@@ -51,8 +51,6 @@ JOURNAL_INFO_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/jourcache.xml"
 J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
 
-CATALOG_CATFILE_MODULE = MODULE.module("catalog-catfile")
-CATALOG_SERFILE_MODULE = MODULE.module("catalog-serfile")
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
 
 
@@ -690,8 +688,9 @@ def _dump_catalog(catalog_records: list[CatalogRecord], file: TextIO, **kwargs: 
 
 
 def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
+    module = MODULE.module("catalog-catfile")
     return thread_map(  # type:ignore
-        lambda x: CATALOG_CATFILE_MODULE.ensure(url=x, force=force),
+        lambda x: module.ensure(url=x, force=force),
         _iter_catpluslease_urls(),
         desc="Downloading catalog catfiles",
         leave=False,
@@ -699,8 +698,9 @@ def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
 
 
 def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
+    module = MODULE.module("catalog-serfile")
     return thread_map(  # type:ignore
-        lambda x: CATALOG_SERFILE_MODULE.ensure(url=x, force=force),
+        lambda x: module.ensure(url=x, force=force),
         _iter_serfile_urls(),
         desc="Downloading catalog serfiles",
         leave=False,
