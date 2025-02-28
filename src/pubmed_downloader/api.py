@@ -335,17 +335,23 @@ def _shared_process(
 ) -> Iterable[Article]:
     ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
 
-    func = functools.partial(
-        _process_xml_gz,
-        ror_grounder=ror_grounder,
-        mesh_grounder=mesh_grounder,
-        force_process=force_process,
-    )
-
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
+        # multiprocessing can't return generators, needs to consumed into lists
+        func = functools.partial(
+            _process_xml_gz,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            force_process=force_process,
+        )
         xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
     else:
+        func = functools.partial(
+            _iterate_process_xml_gz,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            force_process=force_process,
+        )
         xxx = map(func, tqdm(paths, **tqdm_kwargs))
 
     return itt.chain.from_iterable(xxx)
