@@ -260,7 +260,7 @@ def _extract_article(  # noqa:C901
 
     xrefs = [
         Reference(prefix=article_id_tag.attrib["IdType"], identifier=article_id_tag.text)
-        for article_id_tag in medline_citation.findall(".//ArticleIdList/ArticleId")
+        for article_id_tag in pubmed_data.findall(".//ArticleIdList/ArticleId")
     ]
 
     return Article(
