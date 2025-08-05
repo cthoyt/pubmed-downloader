@@ -1,6 +1,7 @@
 """Interact with NCBI rest."""
 
 import os
+import platform
 import shlex
 import stat
 import subprocess
@@ -39,12 +40,13 @@ def get_edirect_directory() -> Path:
     """Get path to eSearch tool."""
     path = MODULE.ensure_untar(url=URL)
 
-    # if you're on an apple system, you need to download this,
-    # and later enable it from the security preferences
-    filename = MODULE.ensure_gunzip("edirect", "edirect", url=URL_APPLE_SILICON)
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        # if you're on an apple system, you need to download this,
+        # and later enable it from the security preferences
+        filename = MODULE.ensure_gunzip("edirect", "edirect", url=URL_APPLE_SILICON)
 
-    # make sure that the file is executable
-    st = os.stat(filename)
-    os.chmod(filename, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        # make sure that the file is executable
+        st = os.stat(filename)
+        os.chmod(filename, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     return path.joinpath("edirect")
