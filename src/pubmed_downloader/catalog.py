@@ -51,8 +51,6 @@ JOURNAL_INFO_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/jourcache.xml"
 J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
 
-CATALOG_CATFILE_MODULE = MODULE.module("catalog-catfile")
-CATALOG_SERFILE_MODULE = MODULE.module("catalog-serfile")
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
 
 
@@ -173,7 +171,7 @@ def _iterate_journals(*, force: bool = False) -> Iterable[Journal]:
     process_catalog_provider_links(force=force)
 
     path = MODULE.ensure(url=JOURNAL_INFO_PATH, force=force)
-    root = etree.parse(path).getroot()  # noqa:S320
+    root = etree.parse(path).getroot()
 
     elements = root.findall("Journal")
     for element in elements:
@@ -655,7 +653,7 @@ def _parse_catalog(
     if cache_path.is_file() and not force_process and False:
         yield from _read_catalog(cache_path)
     else:
-        tree = etree.parse(path)  # noqa:S320
+        tree = etree.parse(path)
         catalog_records = []
         for tag in tree.findall("NLMCatalogRecord"):
             catalog_record = _extract_catalog_record(
@@ -690,8 +688,9 @@ def _dump_catalog(catalog_records: list[CatalogRecord], file: TextIO, **kwargs: 
 
 
 def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
+    module = MODULE.module("catalog-catfile")
     return thread_map(  # type:ignore
-        lambda x: CATALOG_CATFILE_MODULE.ensure(url=x, force=force),
+        lambda x: module.ensure(url=x, force=force),
         _iter_catpluslease_urls(),
         desc="Downloading catalog catfiles",
         leave=False,
@@ -699,8 +698,9 @@ def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
 
 
 def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
+    module = MODULE.module("catalog-serfile")
     return thread_map(  # type:ignore
-        lambda x: CATALOG_SERFILE_MODULE.ensure(url=x, force=force),
+        lambda x: module.ensure(url=x, force=force),
         _iter_serfile_urls(),
         desc="Downloading catalog serfiles",
         leave=False,
@@ -744,9 +744,10 @@ def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iter
         yield base + href
 
 
-@click.command()
+@click.command(name="catalog")
 @click.option("-f", "--force-process", is_flag=True)
 def _main(force_process: bool) -> None:
+    """Download and process the NLM catalog."""
     from collections import Counter
 
     from tabulate import tabulate

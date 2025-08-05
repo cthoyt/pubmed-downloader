@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
@@ -34,6 +35,7 @@ ORCID_PREFIXES = [
     "http://orcid/",
     "https://orcid.org ",
     "https://www.orcid.org/",
+    "http://ORCID.org/",
 ]
 
 
@@ -109,8 +111,6 @@ def parse_author(  # noqa:C901
             logger.warning("unhandled identifier source: %s - %s (%s)", source, it.text, it.attrib)
         else:
             orcid = _clean_orcid(it.text)
-            if not orcid:
-                logger.warning(f"unhandled ORCID: {it.text}")
 
     last_name_tag = tag.find("LastName")
     forename_tag = tag.find("ForeName")
@@ -190,7 +190,7 @@ class Heading(BaseModel):
     """Represents a MeSH heading annnotation."""
 
     name: str
-    descriptor_mesh_id: str
+    mesh_id: str
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
@@ -238,7 +238,7 @@ def parse_mesh_heading(
         )
 
     return Heading(
-        descriptor_mesh_id=descriptor_mesh_id,
+        mesh_id=descriptor_mesh_id,
         name=descriptor_name,
         major=major,
         qualifiers=qualifiers or None,
@@ -270,6 +270,9 @@ def _parse_yn(s: str) -> bool:
             raise ValueError(s)
 
 
+SPLOOSHED_RE = re.compile(r"^\d{15}(\d|X)$")
+
+
 def _clean_orcid(s: str) -> str | None:
     for p in ORCID_PREFIXES:
         if s.startswith(p):
@@ -279,16 +282,16 @@ def _clean_orcid(s: str) -> str | None:
     elif len(s) == 18:
         # malformed, someone forgot the last value
         return None
-    elif len(s) == 16 and s.isnumeric():
+    elif SPLOOSHED_RE.match(s):
         # malformed, forgot dashes
         return f"{s[:4]}-{s[4:8]}-{s[8:12]}-{s[12:]}"
-    elif len(s) == 17 and s.startswith("s") and s[1:].isnumeric():
+    elif len(s) == 17 and s.startswith("s") and SPLOOSHED_RE.match(s[1:]):
         return f"{s[1:5]}-{s[5:9]}-{s[9:13]}-{s[13:]}"
     elif len(s) == 20:
         # extra character got OCR'd, mostly from linking to affiliations
         return s[:20]
     else:
-        logger.warning(f"unhandled ORCID: {s}")
+        logger.debug(f"unhandled ORCID: {s}")
         return None
 
 
