@@ -190,7 +190,7 @@ class Heading(BaseModel):
     """Represents a MeSH heading annnotation."""
 
     name: str
-    descriptor_mesh_id: str
+    mesh_id: str
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
@@ -238,7 +238,7 @@ def parse_mesh_heading(
         )
 
     return Heading(
-        descriptor_mesh_id=descriptor_mesh_id,
+        mesh_id=descriptor_mesh_id,
         name=descriptor_name,
         major=major,
         qualifiers=qualifiers or None,
