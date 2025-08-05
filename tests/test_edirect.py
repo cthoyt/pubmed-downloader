@@ -14,5 +14,6 @@ class TestEDirect(unittest.TestCase):
         d = get_edirect_directory()
         self.assertIsInstance(d, Path)
 
-        res = search_pubmed("bioregistry")  # should be minimum 17 results
-        self.assertLessEqual(17, len(res))
+        pubmeds = search_pubmed("bioregistry")  # should be minimum 17 results
+        self.assertTrue(all(pubmed.isnumeric() for pubmed in pubmeds))
+        self.assertLessEqual(17, len(pubmeds))
