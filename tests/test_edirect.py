@@ -16,4 +16,6 @@ class TestEDirect(unittest.TestCase):
 
         pubmeds = search_pubmed("bioregistry")  # should be minimum 17 results
         self.assertTrue(all(pubmed.isnumeric() for pubmed in pubmeds), msg=f"Result: {pubmeds}")
-        self.assertLessEqual(17, len(pubmeds))
+
+        # This is `Unifying the identification of biomedical entities with the Bioregistry`
+        self.assertIn("36402838", pubmeds)

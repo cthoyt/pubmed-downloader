@@ -31,7 +31,7 @@ def search_pubmed(query: str) -> list[str]:
         raise RuntimeError("efetch is not properly on the filepath")
     # If there are more than 10k IDs, the CLI outputs a . for each
     # iteration, these have to be filtered out
-    pubmeds = [pubmed for pubmed in res.split("\n") if "." not in pubmed]
+    pubmeds = [pubmed for pubmed in res.split("\n") if pubmed and "." not in pubmed]
     return pubmeds
 
 
