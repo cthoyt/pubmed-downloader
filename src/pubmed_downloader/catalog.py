@@ -171,7 +171,7 @@ def _iterate_journals(*, force: bool = False) -> Iterable[Journal]:
     process_catalog_provider_links(force=force)
 
     path = MODULE.ensure(url=JOURNAL_INFO_PATH, force=force)
-    root = etree.parse(path).getroot()  # noqa:S320
+    root = etree.parse(path).getroot()
 
     elements = root.findall("Journal")
     for element in elements:
@@ -653,7 +653,7 @@ def _parse_catalog(
     if cache_path.is_file() and not force_process and False:
         yield from _read_catalog(cache_path)
     else:
-        tree = etree.parse(path)  # noqa:S320
+        tree = etree.parse(path)
         catalog_records = []
         for tag in tree.findall("NLMCatalogRecord"):
             catalog_record = _extract_catalog_record(
