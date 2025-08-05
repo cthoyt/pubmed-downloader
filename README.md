@@ -17,8 +17,8 @@
         <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/pubmed_downloader" /></a>
     <a href="https://github.com/cthoyt/pubmed-downloader/blob/main/LICENSE">
         <img alt="PyPI - License" src="https://img.shields.io/pypi/l/pubmed_downloader" /></a>
-    <a href='https://pubmed_downloader.readthedocs.io/en/latest/?badge=latest'>
-        <img src='https://readthedocs.org/projects/pubmed_downloader/badge/?version=latest' alt='Documentation Status' /></a>
+    <a href='https://pubmed-downloader.readthedocs.io/en/latest/?badge=latest'>
+        <img src='https://readthedocs.org/projects/pubmed-downloader/badge/?version=latest' alt='Documentation Status' /></a>
     <a href="https://codecov.io/gh/cthoyt/pubmed-downloader/branch/main">
         <img src="https://codecov.io/gh/cthoyt/pubmed-downloader/branch/main/graph/badge.svg" alt="Codecov status" /></a>  
     <a href="https://github.com/cthoyt/cookiecutter-python-package">
