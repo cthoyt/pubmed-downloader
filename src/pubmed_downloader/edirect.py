@@ -26,9 +26,7 @@ def search_pubmed(query: str) -> list[str]:
         f"{injection} esearch -db pubmed -query {shlex.quote(query)} "
         f"| {injection} efetch -format uid"
     )
-    print(cmd)
     res = subprocess.getoutput(cmd)  # noqa:S605
-    print(res)
     if "esearch: command not found" in res:
         raise RuntimeError("esearch is not properly on the filepath")
     if "efetch: command not found" in res:
@@ -46,19 +44,17 @@ def get_edirect_directory() -> Path:
     if platform.system() == "Darwin" and platform.machine() == "arm64":
         # if you're on an apple system, you need to download this,
         # and later enable it from the security preferences
-        _xx(URL_APPLE_SILICON)
+        _ensure_xtract_command(URL_APPLE_SILICON)
     elif platform.system() == "Linux":
-        _xx(URL_LINUX)
+        _ensure_xtract_command(URL_LINUX)
 
     return path.joinpath("edirect")
 
 
-def _xx(url: str) -> Path:
-    # if you're on an apple system, you need to download this,
-    # and later enable it from the security preferences
-    filename = MODULE.ensure_gunzip("edirect", "edirect", url=url)
+def _ensure_xtract_command(url: str) -> Path:
+    path = MODULE.ensure_gunzip("edirect", "edirect", url=url)
 
     # make sure that the file is executable
-    st = os.stat(filename)
-    os.chmod(filename, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    return filename
+    st = os.stat(path)
+    os.chmod(path, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return path
