@@ -41,28 +41,29 @@ def get_efetch() -> Path:
     return get_edirect_directory().joinpath("efetch")
 
 
-def search_pubmed(query: str) -> list[str]:
+def search_pubmed(query: str, method: str = "1") -> list[str]:
     """Get PubMed identifiers for a query."""
     search_exe = get_esearch()
     fetch_exe = get_esearch()
-    # cmd = ['./esearch', '-db', 'pubmed', '-query', shlex.quote(query)]
-    # print(cmd)
-    # # cmd = f'{search_exe} -db pubmed -query {shlex.quote(query)} | {fetch_exe} -format uid'
-    # res = subprocess.check_output(cmd, cwd=get_edirect_directory().as_posix())
-    # print('got res', res)
 
     env = os.environ.copy()
     env["PATH"] = get_edirect_directory().as_posix() + os.pathsep + env["PATH"]
 
-    p1 = subprocess.Popen(
-        [search_exe.as_posix(), "-db", "pubmed", "-query", shlex.quote(query)],
-        stdout=subprocess.PIPE,
-        env=env,
-    )
-    p2 = subprocess.Popen(
-        [fetch_exe.as_posix(), "-format", "uid"], stdin=p1.stdout, stdout=subprocess.PIPE, env=env
-    )
-    output, _ = p2.communicate()
+    if method == "1":
+        p1 = subprocess.Popen(
+            [search_exe.as_posix(), "-db", "pubmed", "-query", shlex.quote(query)],
+            stdout=subprocess.PIPE,
+            env=env,
+        )
+        p2 = subprocess.Popen(
+            [fetch_exe.as_posix(), "-format", "uid"], stdin=p1.stdout, stdout=subprocess.PIPE, env=env
+        )
+        output, _ = p2.communicate()
+    elif method == "2":
+        cmd = f'{search_exe} -db pubmed -query {shlex.quote(query)} | {fetch_exe} -format uid'
+        output = subprocess.check_output(cmd, cwd=get_edirect_directory().as_posix())
+    else:
+        raise ValueError
 
     if not isinstance(output, str) or "not found" in output:
         raise RuntimeError
