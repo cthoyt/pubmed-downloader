@@ -22,12 +22,11 @@ jobs:
       # this is the only permission this job requires, so keep it to the least privilege
       # i.e., not to issues, discussions, actions, etc.
       contents: read
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: [ "3.13", "3.10" ]
         tox-command: [ "lint", "pyroma", "mypy" ]
-        os: [ ubuntu-latest, macos-15 ]
     steps:
       - uses: actions/checkout@v4
       - name: "Install uv"
@@ -76,7 +75,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-latest, macos-15 ]
         python-version: [ "3.13", "3.10" ]
     steps:
       - uses: actions/checkout@v4
