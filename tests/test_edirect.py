@@ -2,7 +2,7 @@
 
 import unittest
 
-from pubmed_downloader.rest import search_pubmed
+from pubmed_downloader.edirect import search_pubmed
 
 
 class TestEDirect(unittest.TestCase):
