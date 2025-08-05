@@ -1,6 +1,7 @@
 """Test eDirect utilities."""
 
 import unittest
+
 from pubmed_downloader.rest import search_pubmed
 
 
