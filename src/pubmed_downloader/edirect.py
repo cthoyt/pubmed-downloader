@@ -25,7 +25,9 @@ def search_pubmed(query: str) -> list[str]:
         f"{injection} esearch -db pubmed -query {shlex.quote(query)} "
         f"| {injection} efetch -format uid"
     )
+    print(cmd)
     res = subprocess.getoutput(cmd)  # noqa:S605
+    print(res)
     if "esearch: command not found" in res:
         raise RuntimeError("esearch is not properly on the filepath")
     if "efetch: command not found" in res:
