@@ -22,6 +22,7 @@ from curies import vocabulary as v
 from curies.triples import read_triples, write_triples
 from lxml import etree
 from pydantic import BaseModel, Field
+from pystow.utils import safe_open_writer
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map, thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -522,11 +523,11 @@ def iterate_edges(*, force_process: bool = False) -> Iterable[Triple]:
 
 def save_sssom(**kwargs: Any) -> None:
     """Save an SSSOM file for articles."""
-    with gzip.open(SSSOM_PATH, mode="wt") as file:
+    with safe_open_writer(SSSOM_PATH) as writer:
         for article in iterate_process_articles(**kwargs):
             p = f"pubmed:{article.pubmed}"
             for xref in article.xrefs:
-                print(p, xref.curie, sep="\t", file=file)
+                writer.writerow((p, xref.curie))
 
 
 @click.command(name="articles")
