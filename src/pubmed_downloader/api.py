@@ -396,7 +396,7 @@ def _ensure_grounders(
     if mesh_grounder is None:
         import pyobo
 
-        mesh_grounder = pyobo.get_grounder("ror")
+        mesh_grounder = pyobo.get_grounder("mesh")
 
     return ror_grounder, mesh_grounder
 
