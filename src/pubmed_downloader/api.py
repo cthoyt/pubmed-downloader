@@ -10,6 +10,7 @@ import json
 import logging
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 from xml.etree.ElementTree import Element
 
 import click
@@ -61,6 +62,7 @@ UPDATES_URL = "https://ftp.ncbi.nlm.nih.gov/pubmed/updatefiles/"
 BASELINE_MODULE = MODULE.module("baseline")
 UPDATES_MODULE = MODULE.module("updates")
 EDGES_PATH = MODULE.join(name="edges.tsv.gz")
+SSSOM_PATH = MODULE.join(name="articles.sssom.tsv.gz")
 
 
 def _download_baseline(url: str) -> Path:
@@ -123,13 +125,13 @@ class Article(BaseModel):
     def _triples(self) -> Iterable[Triple]:
         s = Reference(prefix="pubmed", identifier=str(self.pubmed))
         for p, o in self._pos():
-            yield Triple(s, p, o)
+            yield Triple(subject=s, predicate=p, object=o)
 
     def _pos(self) -> Iterable[tuple[Reference, Reference]]:
         for type_mesh_id in self.type_mesh_ids:
             yield v.rdf_type, Reference(prefix="mesh", identifier=type_mesh_id)
         for heading in self.headings:
-            yield HAS_TOPIC, Reference(prefix="mesh", identifier=heading.descriptor_mesh_id)
+            yield HAS_TOPIC, Reference(prefix="mesh", identifier=heading.mesh_id)
         yield IN_JOURNAL, Reference(prefix="nlm", identifier=self.journal.nlm_catalog_id)
         for author in self.authors:
             match author:
@@ -161,7 +163,7 @@ def _parse_from_path(
     path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
 ) -> Iterable[Article]:
     try:
-        tree = etree.parse(path)  # noqa:S320
+        tree = etree.parse(path)
     except etree.XMLSyntaxError:
         tqdm.write(f"failed to parse {path}")
         return
@@ -259,8 +261,10 @@ def _extract_article(  # noqa:C901
     ]
 
     xrefs = [
-        Reference(prefix=article_id_tag.attrib["IdType"], identifier=article_id_tag.text)
+        Reference(prefix=prefix, identifier=article_id_tag.text)
         for article_id_tag in pubmed_data.findall(".//ArticleIdList/ArticleId")
+        # it duplicates its own reference here for some reason, skip PII since it's
+        if article_id_tag.text and (prefix := article_id_tag.attrib["IdType"]) not in SKIP_PREFIXES
     ]
 
     return Article(
@@ -276,6 +280,9 @@ def _extract_article(  # noqa:C901
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
     )
+
+
+SKIP_PREFIXES = {"pubmed"}
 
 
 def _parse_reference(reference_tag: Element) -> str | None:
@@ -513,12 +520,21 @@ def iterate_edges(*, force_process: bool = False) -> Iterable[Triple]:
         yield from article._triples()
 
 
+def save_sssom(**kwargs: Any) -> None:
+    """Save an SSSOM file for articles."""
+    with gzip.open(SSSOM_PATH, mode="wt") as file:
+        for article in iterate_process_articles(**kwargs):
+            p = f"pubmed:{article.pubmed}"
+            for xref in article.xrefs:
+                print(p, xref.curie, sep="\t", file=file)
+
+
 @click.command(name="articles")
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
 def _main(force_process: bool, multiprocessing: bool) -> None:
     """Download and process articles."""
-    process_articles(force_process=force_process, multiprocessing=multiprocessing)
+    save_sssom(force_process=force_process, multiprocessing=multiprocessing)
 
 
 if __name__ == "__main__":
