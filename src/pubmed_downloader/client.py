@@ -16,6 +16,7 @@ import ssslm
 from lxml import etree
 from more_itertools import batched
 from pydantic import BaseModel
+from ratelimit import rate_limited
 from typing_extensions import NotRequired, Unpack
 
 from pubmed_downloader.api import Article, _extract_article
@@ -40,6 +41,9 @@ URL = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz"
 URL_APPLE_SILICON = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Silicon.gz"
 URL_LINUX = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz"
 MODULE = pystow.module("ncbi")
+
+#: https://www.ncbi.nlm.nih.gov/books/NBK25497/ rate limit getting to the API
+get = rate_limited(calls=3, period=1)(requests.get)
 
 
 class PubMedSearchKwargs(TypedDict):
@@ -194,7 +198,7 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
         "db": "pubmed",
     }
     params.update(kwargs)
-    res = requests.get(PUBMED_SEARCH_URL, params=params, timeout=30)
+    res = get(PUBMED_SEARCH_URL, params=params, timeout=30)
     res.raise_for_status()
     tree = etree.fromstring(res.content)
     return SearchResult(
@@ -229,7 +233,7 @@ def _fetch_iter(
 ) -> Iterable[Article]:
     for subset in batched(pubmed_ids, 10_000):
         params = {"db": "pubmed", "id": ",".join(subset), "retmode": "xml"}
-        response = requests.get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
+        response = get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
         tree = etree.fromstring(response.text)
         for article_element in tree.findall("PubmedArticle"):
             article = _extract_article(
