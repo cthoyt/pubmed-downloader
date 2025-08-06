@@ -3,7 +3,13 @@
 import unittest
 from pathlib import Path
 
-from pubmed_downloader.client import get_edirect_directory, search_with_api, search_with_edirect
+from pubmed_downloader.client import (
+    get_abstracts,
+    get_edirect_directory,
+    get_titles,
+    search_with_api,
+    search_with_edirect,
+)
 
 
 class TestEDirect(unittest.TestCase):
@@ -27,3 +33,23 @@ class TestEDirect(unittest.TestCase):
 
         # This is `Unifying the identification of biomedical entities with the Bioregistry`
         self.assertIn("36402838", pubmeds)
+
+    def test_titles(self) -> None:
+        """Test getting titles."""
+        self.assertEqual(
+            [
+                "Disease networks. Uncovering disease-disease relationships "
+                "through the incomplete interactome.",
+                "Early developmental conditioning of later health and disease: "
+                "physiology or pathophysiology?",
+            ],
+            get_titles(["25700523", "25287859"]),
+        )
+
+    def test_abstracts(self) -> None:
+        """Test getting abstracts."""
+        a1, a2 = get_abstracts(["25700523", "25287859"])
+        self.assertIn(
+            "Here we derive mathematical conditions for the identifiability of disease", a1
+        )
+        self.assertIn("Extensive experimental animal studies and epidemiological obse", a2)
