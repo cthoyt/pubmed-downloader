@@ -1,5 +1,6 @@
 """Interact with NCBI rest."""
 
+import logging
 import os
 import platform
 import shlex
@@ -11,6 +12,7 @@ from typing import Any, Literal, NotRequired, TypedDict, Unpack
 import pystow
 import requests
 from lxml import etree
+from pydantic import BaseModel
 
 __all__ = [
     "PubMedSearchKwargs",
@@ -19,6 +21,8 @@ __all__ = [
     "search_with_api",
     "search_with_edirect",
 ]
+
+logger = logging.getLogger(__name__)
 
 PUBMED_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 URL = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz"
@@ -44,6 +48,17 @@ class PubMedSearchKwargs(TypedDict):
     retmax: NotRequired[int]
     reldate: NotRequired[int]
     maxdate: NotRequired[str]
+
+
+class SearchResult(BaseModel):
+    """Results from the PubMed search API."""
+
+    count: int
+    maximum: int
+    start: int
+    identifiers: list[str]
+    query: str
+    query_translation: str
 
 
 def search(query: str, backend: Literal["edirect", "api"] = "api", **kwargs: Any) -> list[str]:
@@ -128,17 +143,22 @@ def search_with_api(
         </eSearchResult>
 
     """
-    tree = _request_api(query, **kwargs)
-    return [element.text for element in tree.findall("IdList/Id")]
+    result = _request_api(query, **kwargs)
+    if len(result.identifiers) < result.count:
+        logger.warning(
+            "Not all PubMeds were returned for search `%s`. Limited by `retmax` of %d",
+            query,
+            result.maximum,
+        )
+    return result.identifiers
 
 
 def count(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> int:
     """Count results."""
-    tree = _request_api(query, **kwargs)
-    return int(tree.find("Count").text)
+    return _request_api(query, **kwargs).count
 
 
-def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> etree._Element:
+def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResult:
     if kwargs.pop("use_text_word", True):
         query += "[tw]"
 
@@ -162,4 +182,15 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> etree._Ele
     res = requests.get(PUBMED_SEARCH_URL, params=params, timeout=30)
     res.raise_for_status()
     tree = etree.fromstring(res.content)
-    return tree
+    return SearchResult(
+        count=int(tree.find("Count").text),
+        maximum=int(tree.find("RetMax").text),
+        start=int(tree.find("RetStart").text),
+        query=query,
+        query_translation=tree.find("QueryTranslation").text,
+        identifiers=[element.text for element in tree.findall("IdList/Id")],
+    )
+
+
+if __name__ == "__main__":
+    pass
