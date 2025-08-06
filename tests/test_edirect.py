@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from pubmed_downloader.edirect import get_edirect_directory, search_pubmed_edirect
+from pubmed_downloader.client import get_edirect_directory, search_with_edirect
 
 
 class TestEDirect(unittest.TestCase):
@@ -14,7 +14,7 @@ class TestEDirect(unittest.TestCase):
         d = get_edirect_directory()
         self.assertIsInstance(d, Path)
 
-        pubmeds = search_pubmed_edirect("bioregistry")  # should be minimum 17 results
+        pubmeds = search_with_edirect("bioregistry")  # should be minimum 17 results
         self.assertTrue(all(pubmed.isnumeric() for pubmed in pubmeds), msg=f"Result: {pubmeds}")
 
         # This is `Unifying the identification of biomedical entities with the Bioregistry`
