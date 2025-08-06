@@ -26,7 +26,7 @@ from .catalog import (
     process_catalog_provider_links,
     process_journal_overview,
 )
-from .client import search
+from .client import count_search_results, search
 from .utils import ISSN, Author, Heading, Qualifier
 
 __all__ = [
@@ -38,6 +38,7 @@ __all__ = [
     "Heading",
     "Journal",
     "Qualifier",
+    "count_search_results",
     "ensure_baselines",
     "ensure_catalog_provider_links",
     "ensure_catfile_catalog",

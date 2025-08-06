@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 __all__ = [
     "PubMedSearchKwargs",
-    "count",
+    "count_search_results",
     "search",
     "search_with_api",
     "search_with_edirect",
@@ -153,7 +153,7 @@ def search_with_api(
     return result.identifiers
 
 
-def count(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> int:
+def count_search_results(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> int:
     """Count results."""
     return _request_api(query, **kwargs).count
 
