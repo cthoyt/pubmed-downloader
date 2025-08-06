@@ -7,16 +7,17 @@ import shlex
 import stat
 import subprocess
 from pathlib import Path
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict
 
 import pystow
 import requests
 from lxml import etree
 from pydantic import BaseModel
-from typing_extensions import Unpack
+from typing_extensions import NotRequired, Unpack
 
 __all__ = [
     "PubMedSearchKwargs",
+    "SearchBackend",
     "count_search_results",
     "search",
     "search_with_api",
@@ -62,7 +63,11 @@ class SearchResult(BaseModel):
     query_translation: str
 
 
-def search(query: str, backend: Literal["edirect", "api"] = "api", **kwargs: Any) -> list[str]:
+#: The serch backend
+SearchBackend: TypeAlias = Literal["edirect", "api"]
+
+
+def search(query: str, backend: SearchBackend = "api", **kwargs: Any) -> list[str]:
     """Search PubMed."""
     if backend == "edirect":
         return search_with_edirect(query)
