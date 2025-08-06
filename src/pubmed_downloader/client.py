@@ -8,7 +8,7 @@ import stat
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal, TypeAlias, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict, overload
 
 import pystow
 import requests
@@ -211,17 +211,79 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
     )
 
 
-def get_titles(pubmed_ids: list[str]) -> list[str]:
+ErrorStrategy: TypeAlias = Literal["raise", "none", "skip"]
+
+
+# docstr-coverage:excused `overload`
+@overload
+def get_titles(
+    pubmed_ids: list[str], *, error_strategy: Literal["raise", "skip"] = ...
+) -> list[str]: ...
+
+
+# docstr-coverage:excused `overload`
+@overload
+def get_titles(
+    pubmed_ids: list[str], *, error_strategy: Literal["none"] = ...
+) -> list[str | None]: ...
+
+
+def get_titles(
+    pubmed_ids: list[str], *, error_strategy: ErrorStrategy = "raise"
+) -> list[str] | list[str | None]:
     """Get titles."""
-    return [article.title for article in _fetch_iter(pubmed_ids)]
+    return [
+        article.title if article is not None else None
+        for article in _fetch_iter(pubmed_ids, error_strategy=error_strategy)
+    ]
 
 
-def get_abstracts(pubmed_ids: list[str]) -> list[str]:
+# docstr-coverage:excused `overload`
+@overload
+def get_abstracts(
+    pubmed_ids: list[str], *, error_strategy: Literal["raise", "skip"] = ...
+) -> list[str]: ...
+
+
+# docstr-coverage:excused `overload`
+@overload
+def get_abstracts(
+    pubmed_ids: list[str], *, error_strategy: Literal["none"] = ...
+) -> list[str | None]: ...
+
+
+def get_abstracts(
+    pubmed_ids: list[str], *, error_strategy: ErrorStrategy = "raise"
+) -> list[str] | list[str | None]:
     """Get abstracts."""
     return [
-        " ".join(abstract.text for abstract in article.abstract)
-        for article in _fetch_iter(pubmed_ids)
+        " ".join(abstract.text for abstract in article.abstract) if article is not None else None
+        for article in _fetch_iter(pubmed_ids, error_strategy=error_strategy)
     ]
+
+
+# docstr-coverage:excused `overload`
+@overload
+def _fetch_iter(
+    pubmed_ids: list[str],
+    *,
+    ror_grounder: ssslm.Grounder | None = ...,
+    mesh_grounder: ssslm.Grounder | None = ...,
+    timeout: int | None = ...,
+    error_strategy: Literal["raise", "skip"] = ...,
+) -> Iterable[Article]: ...
+
+
+# docstr-coverage:excused `overload`
+@overload
+def _fetch_iter(
+    pubmed_ids: list[str],
+    *,
+    ror_grounder: ssslm.Grounder | None = ...,
+    mesh_grounder: ssslm.Grounder | None = ...,
+    timeout: int | None = ...,
+    error_strategy: Literal["none"] = ...,
+) -> Iterable[Article | None]: ...
 
 
 def _fetch_iter(
@@ -230,7 +292,8 @@ def _fetch_iter(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     timeout: int | None = None,
-) -> Iterable[Article]:
+    error_strategy: ErrorStrategy = "none",
+) -> Iterable[Article] | Iterable[Article | None]:
     for subset in batched(pubmed_ids, 10_000):
         params = {"db": "pubmed", "id": ",".join(subset), "retmode": "xml"}
         response = get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
@@ -239,10 +302,13 @@ def _fetch_iter(
             article = _extract_article(
                 article_element, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
             )
-            if article is None:
-                raise ValueError
-            yield article
-
-
-if __name__ == "__main__":
-    pass
+            if article is not None:
+                yield article
+            elif error_strategy == "skip":
+                continue
+            elif error_strategy == "none":
+                yield None
+            elif error_strategy == "raise":
+                raise ValueError(f"could not extract article from: {article_element}")
+            else:
+                raise ValueError(f"invalid error strategy: {error_strategy}")

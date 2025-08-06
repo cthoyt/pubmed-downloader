@@ -182,30 +182,33 @@ def _extract_article(  # noqa:C901
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
-        raise ValueError
+        raise ValueError("article is missing MedlineCitation tag")
     pmid_tag = medline_citation.find("PMID")
     if pmid_tag is None:
-        raise ValueError
+        raise ValueError("article is missing PMID tag")
 
     if not pmid_tag.text:
-        raise ValueError
+        raise ValueError("article has an empty PMID tag")
     pubmed = int(pmid_tag.text)
 
     article = medline_citation.find("Article")
     if article is None:
-        raise ValueError
+        raise ValueError(f"[pubmed:{pubmed}] is missing an Article tag")
     title_tag = article.find("ArticleTitle")
     if title_tag is None:
-        raise ValueError
+        raise ValueError(f"[pubmed:{pubmed}] is missing an ArticleTitle tag")
     title = title_tag.text
     if title is None:
+        logger.debug(
+            "[pubmed:%s] has an empty ArticleTitle tag:%s",
+            pubmed,
+            etree.tostring(element, pretty_print=True, encoding="unicode"),
+        )
         return None
-
-    article.find("Abstract")
 
     pubmed_data = element.find("PubmedData")
     if pubmed_data is None:
-        raise ValueError
+        raise ValueError(f"[pubmed:{pubmed}] is missing a PubmedData tag")
 
     date_completed = parse_date(medline_citation.find("DateCompleted"))
     date_revised = parse_date(medline_citation.find("DateRevised"))
@@ -227,6 +230,7 @@ def _extract_article(  # noqa:C901
 
     medline_journal = medline_citation.find("MedlineJournalInfo")
     if medline_journal is None:
+        logger.debug("[pubmed:%s] missing MedlineJournalInfo section", pubmed)
         return None
 
     issn_linking = medline_journal.findtext("ISSNLinking")
