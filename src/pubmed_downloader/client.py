@@ -16,7 +16,7 @@ import ssslm
 from lxml import etree
 from more_itertools import batched
 from pydantic import BaseModel
-from ratelimit import rate_limited
+from ratelimit import limits, sleep_and_retry
 from typing_extensions import NotRequired, Unpack
 
 from pubmed_downloader.api import Article, _extract_article
@@ -43,7 +43,7 @@ URL_LINUX = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz"
 MODULE = pystow.module("ncbi")
 
 #: https://www.ncbi.nlm.nih.gov/books/NBK25497/ rate limit getting to the API
-get = rate_limited(calls=3, period=1)(requests.get)
+get = sleep_and_retry(limits(calls=3, period=1)(requests.get))
 
 
 class PubMedSearchKwargs(TypedDict):
