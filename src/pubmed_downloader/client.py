@@ -7,12 +7,13 @@ import shlex
 import stat
 import subprocess
 from pathlib import Path
-from typing import Any, Literal, NotRequired, TypedDict, Unpack
+from typing import Any, Literal, NotRequired, TypedDict
 
 import pystow
 import requests
 from lxml import etree
 from pydantic import BaseModel
+from typing_extensions import Unpack
 
 __all__ = [
     "PubMedSearchKwargs",
