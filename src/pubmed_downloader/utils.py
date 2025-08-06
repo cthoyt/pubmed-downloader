@@ -92,7 +92,7 @@ STARTS = (
 
 
 def parse_author(  # noqa:C901
-    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder
+    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder | None
 ) -> Author | Collective | None:
     """Parse an author XML object."""
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
@@ -121,7 +121,7 @@ def parse_author(  # noqa:C901
 
     if collective_name_tag is not None and collective_name_tag.text:
         name = collective_name_tag.text.rstrip(".")
-        match = ror_grounder.get_best_match(name)
+        match = ror_grounder.get_best_match(name) if ror_grounder is not None else None
         return Collective(
             position=position, name=name, reference=match.reference if match else None, roles=roles
         )
@@ -199,7 +199,7 @@ MESH_MISSES: set[str] = set()
 
 
 def parse_mesh_heading(
-    mesh_heading_tag: Element, *, mesh_grounder: ssslm.Grounder
+    mesh_heading_tag: Element, *, mesh_grounder: ssslm.Grounder | None
 ) -> Heading | None:
     """Parse a MeSH heading."""
     descriptor_name_tag = mesh_heading_tag.find("DescriptorName")
@@ -212,7 +212,11 @@ def parse_mesh_heading(
     if not descriptor_name and not descriptor_mesh_id:
         return None
     elif descriptor_name and not descriptor_mesh_id:
-        best_match = mesh_grounder.get_best_match(descriptor_name.rstrip("."))
+        best_match = (
+            mesh_grounder.get_best_match(descriptor_name.rstrip("."))
+            if mesh_grounder is not None
+            else None
+        )
         if best_match is not None:
             descriptor_mesh_id = best_match.identifier
         else:

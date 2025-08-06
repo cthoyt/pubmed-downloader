@@ -6,29 +6,36 @@ import platform
 import shlex
 import stat
 import subprocess
+from collections.abc import Iterable
+from itertools import batched
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, TypedDict
 
 import pystow
 import requests
+import ssslm
 from lxml import etree
 from pydantic import BaseModel
 from typing_extensions import NotRequired, Unpack
+
+from pubmed_downloader.api import Article, _extract_article
 
 __all__ = [
     "PubMedSearchKwargs",
     "SearchBackend",
     "count_search_results",
+    "get_abstracts",
+    "get_titles",
     "search",
     "search_with_api",
     "search_with_edirect",
-    "get_titles",
-    "get_abstracts",
 ]
 
 logger = logging.getLogger(__name__)
 
 PUBMED_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+PUBMED_FETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+
 URL = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz"
 URL_APPLE_SILICON = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Silicon.gz"
 URL_LINUX = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz"
@@ -201,8 +208,37 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
 
 
 def get_titles(pubmed_ids: list[str]) -> list[str]:
-    raise NotImplementedError
+    """Get titles."""
+    return [article.title for article in _fetch_iter(pubmed_ids)]
 
 
 def get_abstracts(pubmed_ids: list[str]) -> list[str]:
-    raise NotImplementedError
+    """Get abstracts."""
+    return [
+        " ".join(abstract.text for abstract in article.abstract)
+        for article in _fetch_iter(pubmed_ids)
+    ]
+
+
+def _fetch_iter(
+    pubmed_ids: list[str],
+    *,
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
+    timeout: int | None = None,
+) -> Iterable[Article]:
+    for subset in batched(pubmed_ids, 10_000):
+        params = {"db": "pubmed", "id": ",".join(subset), "retmode": "xml"}
+        response = requests.get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
+        tree = etree.fromstring(response.text)
+        for article_element in tree.findall("PubmedArticle"):
+            article = _extract_article(
+                article_element, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+            )
+            if article is None:
+                raise ValueError
+            yield article
+
+
+if __name__ == "__main__":
+    pass
