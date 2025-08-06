@@ -7,7 +7,6 @@ import shlex
 import stat
 import subprocess
 from collections.abc import Iterable
-from itertools import batched
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, TypedDict
 
@@ -15,6 +14,7 @@ import pystow
 import requests
 import ssslm
 from lxml import etree
+from more_itertools import batched
 from pydantic import BaseModel
 from typing_extensions import NotRequired, Unpack
 
