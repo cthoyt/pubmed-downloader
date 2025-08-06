@@ -22,6 +22,8 @@ __all__ = [
     "search",
     "search_with_api",
     "search_with_edirect",
+    "get_titles",
+    "get_abstracts",
 ]
 
 logger = logging.getLogger(__name__)
@@ -196,3 +198,11 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
         query_translation=tree.find("QueryTranslation").text,
         identifiers=[element.text for element in tree.findall("IdList/Id")],
     )
+
+
+def get_titles(pubmed_ids: list[str]) -> list[str]:
+    raise NotImplementedError
+
+
+def get_abstracts(pubmed_ids: list[str]) -> list[str]:
+    raise NotImplementedError
