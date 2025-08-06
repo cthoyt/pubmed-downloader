@@ -67,11 +67,11 @@ class SearchResult(BaseModel):
 SearchBackend: TypeAlias = Literal["edirect", "api"]
 
 
-def search(query: str, backend: SearchBackend = "api", **kwargs: Any) -> list[str]:
+def search(query: str, backend: SearchBackend | None = None, **kwargs: Any) -> list[str]:
     """Search PubMed."""
     if backend == "edirect":
         return search_with_edirect(query)
-    elif backend == "api":
+    elif backend == "api" or backend is None:
         return search_with_api(query, **kwargs)
     else:
         raise ValueError
