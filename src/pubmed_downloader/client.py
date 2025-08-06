@@ -6,16 +6,18 @@ import shlex
 import stat
 import subprocess
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, NotRequired, TypedDict, Unpack
 
 import pystow
 import requests
 from lxml import etree
 
 __all__ = [
-    "search_pubmed",
-    "search_pubmed_api",
-    "search_pubmed_edirect",
+    "PubMedSearchKwargs",
+    "count",
+    "search",
+    "search_with_api",
+    "search_with_edirect",
 ]
 
 PUBMED_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -25,19 +27,36 @@ URL_LINUX = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz"
 MODULE = pystow.module("ncbi")
 
 
-def search_pubmed(
-    query: str, backend: Literal["edirect", "api"] = "api", **kwargs: Any
-) -> list[str]:
+class PubMedSearchKwargs(TypedDict):
+    """Keyword arguments for the PubMed search API.
+
+    .. seealso:: https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.ESearch
+    """
+
+    use_text_word: NotRequired[bool]
+    """
+    Automatically add the ``[tw]`` type to the query to only search
+    the title, abstract, and text fields. Useful to avoid spurious results.
+
+    .. seealso:: https://www.nlm.nih.gov/bsd/disted/pubmedtutorial/020_760.html
+    """
+    retstart: NotRequired[int]
+    retmax: NotRequired[int]
+    reldate: NotRequired[int]
+    maxdate: NotRequired[str]
+
+
+def search(query: str, backend: Literal["edirect", "api"] = "api", **kwargs: Any) -> list[str]:
     """Search PubMed."""
     if backend == "edirect":
-        return search_pubmed_edirect(query)
+        return search_with_edirect(query)
     elif backend == "api":
-        return search_pubmed_api(query, **kwargs)
+        return search_with_api(query, **kwargs)
     else:
         raise ValueError
 
 
-def search_pubmed_edirect(query: str) -> list[str]:
+def search_with_edirect(query: str) -> list[str]:
     """Get PubMed identifiers for a query."""
     injection = f"PATH={get_edirect_directory().as_posix()}:${{PATH}}"
     cmd = (
@@ -78,26 +97,14 @@ def _ensure_xtract_command(url: str) -> Path:
     return path
 
 
-def search_pubmed_api(
-    search_term: str,
-    use_text_word: bool = True,
-    retstart: int = 0,
-    retmax: int = 10_000,
-    reldate: int | None = None,
-    maxdate: str | None = None,
-    **kwargs: Any,
+def search_with_api(
+    query: str,
+    **kwargs: Unpack[PubMedSearchKwargs],
 ) -> list[str]:
     """Search Pubmed for paper IDs given a search term.
 
-    Parameters
-    ----------
-    :param search_term:
+    :param query:
         A term for which the PubMed search should be performed.
-    :param use_text_word:
-        Automatically add the ``[tw]`` type to the query to only search
-        the title, abstract, and text fields. Useful to avoid spurious results.
-
-        .. seealso:: https://www.nlm.nih.gov/bsd/disted/pubmedtutorial/020_760.html
     :param kwargs:
         Additional keyword arguments to pass to the PubMed search as
         parameters. See https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.ESearch
@@ -121,20 +128,38 @@ def search_pubmed_api(
         </eSearchResult>
 
     """
-    if use_text_word:
-        search_term += "[tw]"
-    params = {
-        "term": search_term,
+    tree = _request_api(query, **kwargs)
+    return [element.text for element in tree.findall("IdList/Id")]
+
+
+def count(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> int:
+    """Count results."""
+    tree = _request_api(query, **kwargs)
+    return int(tree.find("Count").text)
+
+
+def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> etree._Element:
+    if kwargs.pop("use_text_word", True):
+        query += "[tw]"
+
+    retmax = kwargs.pop("retmax", 10_000)
+    if retmax <= 0:
+        raise ValueError
+    if retmax > 10_000:
+        retmax = 10_000
+
+    retstart = kwargs.pop("retstart", 0)
+    if retstart < 0:
+        raise ValueError
+
+    params: dict[str, Any] = {
+        "term": query,
         "retmax": retmax,
         "retstart": retstart,
         "db": "pubmed",
     }
-    if reldate:
-        params["reldate"] = reldate
-    if maxdate:
-        params["maxdate"] = maxdate
     params.update(kwargs)
     res = requests.get(PUBMED_SEARCH_URL, params=params, timeout=30)
     res.raise_for_status()
     tree = etree.fromstring(res.content)
-    return [element.text for element in tree.findall("IdList/Id")]
+    return tree

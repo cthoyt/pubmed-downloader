@@ -26,7 +26,7 @@ from .catalog import (
     process_catalog_provider_links,
     process_journal_overview,
 )
-from .client import search_pubmed
+from .client import search
 from .utils import ISSN, Author, Heading, Qualifier
 
 __all__ = [
@@ -56,5 +56,5 @@ __all__ = [
     "process_catalog_provider_links",
     "process_journal_overview",
     "process_updates",
-    "search_pubmed",
+    "search",
 ]
