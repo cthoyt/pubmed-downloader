@@ -190,7 +190,3 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
         query_translation=tree.find("QueryTranslation").text,
         identifiers=[element.text for element in tree.findall("IdList/Id")],
     )
-
-
-if __name__ == "__main__":
-    pass
