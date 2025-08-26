@@ -26,7 +26,15 @@ from .catalog import (
     process_catalog_provider_links,
     process_journal_overview,
 )
-from .client import count_search_results, get_abstracts, get_titles, search
+from .client import (
+    count_search_results,
+    get_abstracts,
+    get_abstracts_dict,
+    get_articles,
+    get_titles,
+    get_titles_dict,
+    search,
+)
 from .utils import ISSN, Author, Heading, Qualifier
 
 __all__ = [
@@ -46,7 +54,10 @@ __all__ = [
     "ensure_serfile_catalog",
     "ensure_updates",
     "get_abstracts",
+    "get_abstracts_dict",
+    "get_articles",
     "get_titles",
+    "get_titles_dict",
     "iterate_ensure_articles",
     "iterate_ensure_baselines",
     "iterate_ensure_updates",
