@@ -29,6 +29,7 @@ __all__ = [
     "get_abstracts",
     "get_abstracts_dict",
     "get_articles",
+    "get_articles_dict",
     "get_titles",
     "get_titles_dict",
     "search",
@@ -344,3 +345,10 @@ def get_articles(  # noqa:C901
                     raise ValueError(f"could not extract article from: {article_element}")
                 else:
                     raise ValueError(f"invalid error strategy: {error_strategy}")
+
+
+def get_articles_dict(pubmed_ids: Iterable[int | str]) -> dict[str, Article]:
+    """Get a mapping of PubMed IDs to articles."""
+    return {
+        str(article.pubmed): article for article in get_articles(pubmed_ids, error_strategy="skip")
+    }
