@@ -28,6 +28,7 @@ __all__ = [
     "get_abstracts",
     "get_titles",
     "search",
+    "get_articles",
     "search_with_api",
     "search_with_edirect",
 ]
@@ -217,55 +218,55 @@ ErrorStrategy: TypeAlias = Literal["raise", "none", "skip"]
 # docstr-coverage:excused `overload`
 @overload
 def get_titles(
-    pubmed_ids: list[str], *, error_strategy: Literal["raise", "skip"] = ...
+    pubmed_ids: Iterable[str | int], *, error_strategy: Literal["raise", "skip"] = ...
 ) -> list[str]: ...
 
 
 # docstr-coverage:excused `overload`
 @overload
 def get_titles(
-    pubmed_ids: list[str], *, error_strategy: Literal["none"] = ...
+    pubmed_ids: Iterable[str | int], *, error_strategy: Literal["none"] = ...
 ) -> list[str | None]: ...
 
 
 def get_titles(
-    pubmed_ids: list[str], *, error_strategy: ErrorStrategy = "raise"
+    pubmed_ids: Iterable[str | int], *, error_strategy: ErrorStrategy = "raise"
 ) -> list[str] | list[str | None]:
     """Get titles."""
     return [
         article.title if article is not None else None
-        for article in _fetch_iter(pubmed_ids, error_strategy=error_strategy)
+        for article in get_articles(pubmed_ids, error_strategy=error_strategy)
     ]
 
 
 # docstr-coverage:excused `overload`
 @overload
 def get_abstracts(
-    pubmed_ids: list[str], *, error_strategy: Literal["raise", "skip"] = ...
+    pubmed_ids: Iterable[str | int], *, error_strategy: Literal["raise", "skip"] = ...
 ) -> list[str]: ...
 
 
 # docstr-coverage:excused `overload`
 @overload
 def get_abstracts(
-    pubmed_ids: list[str], *, error_strategy: Literal["none"] = ...
+    pubmed_ids: Iterable[str | int], *, error_strategy: Literal["none"] = ...
 ) -> list[str | None]: ...
 
 
 def get_abstracts(
-    pubmed_ids: list[str], *, error_strategy: ErrorStrategy = "raise"
+    pubmed_ids: Iterable[str | int], *, error_strategy: ErrorStrategy = "raise"
 ) -> list[str] | list[str | None]:
     """Get abstracts."""
     return [
-        " ".join(abstract.text for abstract in article.abstract) if article is not None else None
-        for article in _fetch_iter(pubmed_ids, error_strategy=error_strategy)
+        article.get_abstract() if article is not None else None
+        for article in get_articles(pubmed_ids, error_strategy=error_strategy)
     ]
 
 
 # docstr-coverage:excused `overload`
 @overload
-def _fetch_iter(
-    pubmed_ids: list[str],
+def get_articles(
+    pubmed_ids: Iterable[str | int],
     *,
     ror_grounder: ssslm.Grounder | None = ...,
     mesh_grounder: ssslm.Grounder | None = ...,
@@ -276,8 +277,8 @@ def _fetch_iter(
 
 # docstr-coverage:excused `overload`
 @overload
-def _fetch_iter(
-    pubmed_ids: list[str],
+def get_articles(
+    pubmed_ids: Iterable[str | int],
     *,
     ror_grounder: ssslm.Grounder | None = ...,
     mesh_grounder: ssslm.Grounder | None = ...,
@@ -286,29 +287,49 @@ def _fetch_iter(
 ) -> Iterable[Article | None]: ...
 
 
-def _fetch_iter(
-    pubmed_ids: list[str],
+def get_articles(
+    pubmed_ids: Iterable[str | int],
     *,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     timeout: int | None = None,
     error_strategy: ErrorStrategy = "none",
 ) -> Iterable[Article] | Iterable[Article | None]:
+    """Get articles."""
     for subset in batched(pubmed_ids, 10_000):
-        params = {"db": "pubmed", "id": ",".join(subset), "retmode": "xml"}
+        params = {"db": "pubmed", "id": ",".join(_clean_pubmed_ids(subset)), "retmode": "xml"}
         response = get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
-        tree = etree.fromstring(response.text)
-        for article_element in tree.findall("PubmedArticle"):
-            article = _extract_article(
-                article_element, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
-            )
-            if article is not None:
-                yield article
-            elif error_strategy == "skip":
+        try:
+            tree = etree.fromstring(response.text)
+        except etree.XMLSyntaxError:
+            if error_strategy == "skip":
                 continue
             elif error_strategy == "none":
                 yield None
-            elif error_strategy == "raise":
-                raise ValueError(f"could not extract article from: {article_element}")
             else:
-                raise ValueError(f"invalid error strategy: {error_strategy}")
+                raise ValueError(f"could not extract article from response: {response.text}")
+        else:
+            for article_element in tree.findall("PubmedArticle"):
+                article = _extract_article(
+                    article_element, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+                )
+                if article is not None:
+                    yield article
+                elif error_strategy == "skip":
+                    continue
+                elif error_strategy == "none":
+                    yield None
+                elif error_strategy == "raise":
+                    raise ValueError(f"could not extract article from: {article_element}")
+                else:
+                    raise ValueError(f"invalid error strategy: {error_strategy}")
+
+
+def _clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:
+    for pubmed_id in pubmed_ids:
+        if isinstance(pubmed_id, int):
+            yield str(pubmed_id)
+        elif isinstance(pubmed_id, str):
+            yield str(int(pubmed_id.strip()))
+        else:
+            raise TypeError
