@@ -19,16 +19,19 @@ from pydantic import BaseModel
 from ratelimit import limits, sleep_and_retry
 from typing_extensions import NotRequired, Unpack
 
-from pubmed_downloader.api import Article, _extract_article
+from .api import Article, _extract_article
+from .utils import clean_pubmed_ids
 
 __all__ = [
     "PubMedSearchKwargs",
     "SearchBackend",
     "count_search_results",
     "get_abstracts",
-    "get_titles",
-    "search",
+    "get_abstracts_dict",
     "get_articles",
+    "get_titles",
+    "get_titles_dict",
+    "search",
     "search_with_api",
     "search_with_edirect",
 ]
@@ -77,7 +80,7 @@ class SearchResult(BaseModel):
     query_translation: str
 
 
-#: The serch backend
+#: The search backend
 SearchBackend: TypeAlias = Literal["edirect", "api"]
 
 
@@ -239,6 +242,15 @@ def get_titles(
     ]
 
 
+def get_titles_dict(pubmed_ids: Iterable[str | int]) -> dict[str, str]:
+    """Get titles."""
+    return {
+        str(article.pubmed): article.title
+        for article in get_articles(pubmed_ids, error_strategy="skip")
+        if article.title
+    }
+
+
 # docstr-coverage:excused `overload`
 @overload
 def get_abstracts(
@@ -261,6 +273,15 @@ def get_abstracts(
         article.get_abstract() if article is not None else None
         for article in get_articles(pubmed_ids, error_strategy=error_strategy)
     ]
+
+
+def get_abstracts_dict(pubmed_ids: Iterable[str | int]) -> dict[str, str]:
+    """Get abstracts."""
+    return {
+        str(article.pubmed): abstract
+        for article in get_articles(pubmed_ids, error_strategy="skip")
+        if (abstract := article.get_abstract())
+    }
 
 
 # docstr-coverage:excused `overload`
@@ -287,7 +308,7 @@ def get_articles(
 ) -> Iterable[Article | None]: ...
 
 
-def get_articles(
+def get_articles(  # noqa:C901
     pubmed_ids: Iterable[str | int],
     *,
     ror_grounder: ssslm.Grounder | None = None,
@@ -297,17 +318,17 @@ def get_articles(
 ) -> Iterable[Article] | Iterable[Article | None]:
     """Get articles."""
     for subset in batched(pubmed_ids, 10_000):
-        params = {"db": "pubmed", "id": ",".join(_clean_pubmed_ids(subset)), "retmode": "xml"}
+        params = {"db": "pubmed", "id": ",".join(clean_pubmed_ids(subset)), "retmode": "xml"}
         response = get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
         try:
             tree = etree.fromstring(response.text)
-        except etree.XMLSyntaxError:
+        except etree.XMLSyntaxError as e:
             if error_strategy == "skip":
                 continue
             elif error_strategy == "none":
                 yield None
             else:
-                raise ValueError(f"could not extract article from response: {response.text}")
+                raise ValueError(f"could not extract article from response: {response.text}") from e
         else:
             for article_element in tree.findall("PubmedArticle"):
                 article = _extract_article(
@@ -323,13 +344,3 @@ def get_articles(
                     raise ValueError(f"could not extract article from: {article_element}")
                 else:
                     raise ValueError(f"invalid error strategy: {error_strategy}")
-
-
-def _clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:
-    for pubmed_id in pubmed_ids:
-        if isinstance(pubmed_id, int):
-            yield str(pubmed_id)
-        elif isinstance(pubmed_id, str):
-            yield str(int(pubmed_id.strip()))
-        else:
-            raise TypeError

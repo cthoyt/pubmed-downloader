@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import re
+from collections.abc import Iterable
 from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
@@ -16,6 +17,7 @@ from tqdm import tqdm
 
 __all__ = [
     "MODULE",
+    "clean_pubmed_ids",
     "parse_date",
 ]
 
@@ -303,3 +305,14 @@ def _json_default(o: Any) -> Any:
     if isinstance(o, datetime.date | datetime.datetime):
         return o.isoformat()
     return o
+
+
+def clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:
+    """Clean a list of PubMed identifiers."""
+    for pubmed_id in pubmed_ids:
+        if isinstance(pubmed_id, int):
+            yield str(pubmed_id)
+        elif isinstance(pubmed_id, str):
+            yield str(int(pubmed_id.strip()))
+        else:
+            raise TypeError
