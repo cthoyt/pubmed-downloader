@@ -390,7 +390,7 @@ def _extract_catalog_record(  # noqa:C901
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder,
 ) -> CatalogRecord | None:
     nlm_catalog_id = tag.findtext("NlmUniqueID")
     if not nlm_catalog_id:
@@ -623,10 +623,11 @@ def iterate_process_catalog(
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
     import pyobo
+    from orcid_downloader.lexical import get_orcid_grounder
 
     ror_grounder = pyobo.get_grounder("ror")
     mesh_grounder = pyobo.get_grounder("mesh")
-    author_grounder = None
+    author_grounder = get_orcid_grounder()
 
     for path in tqdm(ensure_serfile_catalog(force=force), desc="Processing NLM Catalog"):
         yield from _parse_catalog(
@@ -654,7 +655,7 @@ def _parse_catalog(
     force_process: bool = False,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder,
 ) -> Iterable[CatalogRecord]:
     cache_path = path.with_suffix(".json.gz")
     if cache_path.is_file() and not force_process and False:

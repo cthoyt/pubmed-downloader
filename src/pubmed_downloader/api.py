@@ -338,6 +338,7 @@ def iterate_process_baselines(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines()
@@ -345,6 +346,7 @@ def iterate_process_baselines(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
         unit="baseline",
@@ -466,20 +468,23 @@ def iterate_process_articles(
     force_process: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    ror_grounder, mesh_grounder, author_grounder, = _ensure_grounders(ror_grounder, mesh_grounder, author_grounder)
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
     )
 
