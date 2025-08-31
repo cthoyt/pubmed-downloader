@@ -122,7 +122,7 @@ class Article(BaseModel):
     headings: list[Heading] = Field(default_factory=list)
     journal: Journal
     abstract: list[AbstractText] = Field(default_factory=list)
-    authors: list[Author | Collective]
+    authors: list[Author | Collective] = Field(default_factory=list)
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
     history: list[History] = Field(default_factory=list)
