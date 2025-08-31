@@ -351,7 +351,7 @@ def _get_journal_issue(article: Element) -> JournalIssue:
 def _parse_pub_date(element: Element) -> History | None:
     status = element.attrib.get("PubStatus")
     if status is None:
-        tqdm.write(f'missing status: {etree.tostring(element)}')
+        tqdm.write(f"missing status: {etree.tostring(element)}")
         return None
     date = parse_date(element)
     if date is None:
@@ -363,6 +363,7 @@ def _parse_pub_date(element: Element) -> History | None:
         return None
     else:
         return rv
+
 
 SKIP_PREFIXES = {"pubmed"}
 
