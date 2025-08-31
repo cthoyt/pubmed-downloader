@@ -15,7 +15,7 @@ def main() -> None:
 
 
 @main.command()
-@click.option("--maximum", type=int, default=10_000)
+@click.option("--maximum", "-m", type=int, default=10_000)
 def demo(maximum: int) -> None:
     """Test processing."""
     from tqdm import tqdm
