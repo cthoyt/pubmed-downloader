@@ -10,7 +10,7 @@ import json
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
 import click
@@ -95,6 +95,13 @@ class AbstractText(BaseModel):
     category: str | None = None
 
 
+class History(BaseModel):
+    """Represents a history item."""
+
+    status: Literal["received", "accepted", "pubmed", "medline", "entrez", "pmc-release"]
+    date: datetime.date
+
+
 #: aslo see edam:has_topic
 HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
 #: also see biolink:published_in, EFO:0001796
@@ -118,6 +125,7 @@ class Article(BaseModel):
     authors: list[Author | Collective] = Field(default_factory=list)
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
+    history: list[History] = Field(default_factory=list)
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -287,6 +295,11 @@ def _extract_article(  # noqa:C901
         if article_id_tag.text and (prefix := article_id_tag.attrib["IdType"]) not in SKIP_PREFIXES
     ]
 
+    history = [
+        _parse_pub_date(pubmed_date)
+        for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
+    ]
+
     return Article(
         pubmed=pubmed,
         title=title,
@@ -299,7 +312,26 @@ def _extract_article(  # noqa:C901
         authors=authors,
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
+        history=history,
     )
+
+
+def _parse_pub_date(element: Element) -> History:
+    status = element.attrib.get("PubStatus")
+    year = _find_int(element, "Year")
+    if year is None:
+        raise ValueError
+    month = _find_int(element, "Month")
+    day = _find_int(element, "Day")
+    date = datetime.date(year=year, month=month, day=day)  # type:ignore[arg-type]
+    return History(status=status, date=date)
+
+
+def _find_int(element: Element, key: str) -> int | None:
+    xx = element.findtext(key)
+    if xx:
+        return int(xx)
+    return None
 
 
 SKIP_PREFIXES = {"pubmed"}

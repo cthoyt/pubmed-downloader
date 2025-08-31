@@ -17,6 +17,7 @@ from lxml import etree
 from more_itertools import batched
 from pydantic import BaseModel
 from ratelimit import limits, sleep_and_retry
+from tqdm import tqdm
 from typing_extensions import NotRequired, Unpack
 
 from .api import Article, _extract_article
@@ -39,8 +40,10 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-PUBMED_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-PUBMED_FETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+EUTILS_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+EUTILS_FETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+
+DEFAULT_BATCH_SIZE = 200
 
 URL = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz"
 URL_APPLE_SILICON = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Silicon.gz"
@@ -48,7 +51,7 @@ URL_LINUX = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz"
 MODULE = pystow.module("ncbi")
 
 #: https://www.ncbi.nlm.nih.gov/books/NBK25497/ rate limit getting to the API
-get = sleep_and_retry(limits(calls=3, period=1)(requests.get))
+ratelimited_requests_get = sleep_and_retry(limits(calls=3, period=1)(requests.get))
 
 
 class PubMedSearchKwargs(TypedDict):
@@ -203,7 +206,7 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
         "db": "pubmed",
     }
     params.update(kwargs)
-    res = get(PUBMED_SEARCH_URL, params=params, timeout=30)
+    res = ratelimited_requests_get(EUTILS_SEARCH_URL, params=params, timeout=30)
     res.raise_for_status()
     tree = etree.fromstring(res.content)
     return SearchResult(
@@ -294,6 +297,8 @@ def get_articles(
     mesh_grounder: ssslm.Grounder | None = ...,
     timeout: int | None = ...,
     error_strategy: Literal["raise", "skip"] = ...,
+    batch_size: int | None = ...,
+    progress: bool = ...,
 ) -> Iterable[Article]: ...
 
 
@@ -306,6 +311,8 @@ def get_articles(
     mesh_grounder: ssslm.Grounder | None = ...,
     timeout: int | None = ...,
     error_strategy: Literal["none"] = ...,
+    batch_size: int | None = ...,
+    progress: bool = ...,
 ) -> Iterable[Article | None]: ...
 
 
@@ -316,20 +323,42 @@ def get_articles(  # noqa:C901
     mesh_grounder: ssslm.Grounder | None = None,
     timeout: int | None = None,
     error_strategy: ErrorStrategy = "none",
+    batch_size: int | None = None,
+    progress: bool = False,
 ) -> Iterable[Article] | Iterable[Article | None]:
     """Get articles."""
-    for subset in batched(pubmed_ids, 10_000):
-        params = {"db": "pubmed", "id": ",".join(clean_pubmed_ids(subset)), "retmode": "xml"}
-        response = get(PUBMED_FETCH_URL, params=params, timeout=timeout or 300)
+    if batch_size is None:
+        # TODO check if 200 is the maximum allowed size
+        batch_size = DEFAULT_BATCH_SIZE
+    for batch_n, subset in enumerate(
+        batched(
+            tqdm(
+                pubmed_ids,
+                disable=not progress,
+                unit_scale=True,
+                unit="article",
+                desc="getting articles",
+            ),
+            batch_size,
+        )
+    ):
+        subset_x = list(clean_pubmed_ids(subset))
+        params = {"db": "pubmed", "id": ",".join(subset_x), "retmode": "xml"}
+        response = ratelimited_requests_get(EUTILS_FETCH_URL, params=params, timeout=timeout or 300)
         try:
             tree = etree.fromstring(response.text)
         except etree.XMLSyntaxError as e:
+            if error_strategy == "raise":
+                raise ValueError(f"could not extract article from response: {response.text}") from e
+            logger.warning(
+                "error while retrieving %d PubMed IDs in batch %d: %s", len(subset_x), batch_n, e
+            )
             if error_strategy == "skip":
                 continue
             elif error_strategy == "none":
                 yield None
             else:
-                raise ValueError(f"could not extract article from response: {response.text}") from e
+                raise InvalidErrorStrategyError(error_strategy) from None
         else:
             for article_element in tree.findall("PubmedArticle"):
                 article = _extract_article(
@@ -344,11 +373,27 @@ def get_articles(  # noqa:C901
                 elif error_strategy == "raise":
                     raise ValueError(f"could not extract article from: {article_element}")
                 else:
-                    raise ValueError(f"invalid error strategy: {error_strategy}")
+                    raise InvalidErrorStrategyError(error_strategy)
 
 
-def get_articles_dict(pubmed_ids: Iterable[int | str]) -> dict[str, Article]:
+class InvalidErrorStrategyError(ValueError):
+    """Raised when passing an invalid error strategy."""
+
+    def __init__(self, value: str) -> None:
+        """Initialize the value error."""
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"invalid error strategy: {self.value}"
+
+
+def get_articles_dict(
+    pubmed_ids: Iterable[int | str], *, progress: bool = False, batch_size: int | None = None
+) -> dict[str, Article]:
     """Get a mapping of PubMed IDs to articles."""
     return {
-        str(article.pubmed): article for article in get_articles(pubmed_ids, error_strategy="skip")
+        str(article.pubmed): article
+        for article in get_articles(
+            pubmed_ids, error_strategy="skip", progress=progress, batch_size=batch_size
+        )
     }
