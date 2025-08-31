@@ -17,6 +17,5 @@ def main() -> None:
 main.add_command(api._main)
 main.add_command(catalog._main)
 
-
 if __name__ == "__main__":
     main()
