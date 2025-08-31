@@ -4,6 +4,9 @@ import datetime
 import unittest
 from pathlib import Path
 
+from lxml import etree
+
+from pubmed_downloader.api import History, _extract_article
 from pubmed_downloader.client import (
     get_abstracts,
     get_edirect_directory,
@@ -11,8 +14,6 @@ from pubmed_downloader.client import (
     search_with_api,
     search_with_edirect,
 )
-from lxml import etree
-from pubmed_downloader.api import _extract_article, History
 
 HERE = Path(__file__).parent.resolve()
 SAMPLE_PATH = HERE.joinpath("sample.xml")
