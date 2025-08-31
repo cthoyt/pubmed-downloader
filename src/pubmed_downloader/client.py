@@ -392,5 +392,7 @@ def get_articles_dict(
     """Get a mapping of PubMed IDs to articles."""
     return {
         str(article.pubmed): article
-        for article in get_articles(pubmed_ids, error_strategy="skip", progress=progress, batch_size=batch_size)
+        for article in get_articles(
+            pubmed_ids, error_strategy="skip", progress=progress, batch_size=batch_size
+        )
     }
