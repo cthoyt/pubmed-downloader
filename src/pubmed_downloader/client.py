@@ -321,6 +321,7 @@ def get_articles(  # noqa:C901
     *,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     timeout: int | None = None,
     error_strategy: ErrorStrategy = "none",
     batch_size: int | None = None,
@@ -362,7 +363,10 @@ def get_articles(  # noqa:C901
         else:
             for article_element in tree.findall("PubmedArticle"):
                 article = _extract_article(
-                    article_element, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+                    article_element,
+                    ror_grounder=ror_grounder,
+                    mesh_grounder=mesh_grounder,
+                    author_grounder=author_grounder,
                 )
                 if article is not None:
                     yield article

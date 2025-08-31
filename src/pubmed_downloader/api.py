@@ -447,7 +447,7 @@ def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     author_grounder: ssslm.Grounder | None = None,
-) -> tuple[ssslm.Grounder, ssslm.Grounder, ssslm.Grounder | None]:
+) -> tuple[ssslm.Grounder, ssslm.Grounder, ssslm.Grounder]:
     if ror_grounder is None:
         import pyobo
 
@@ -538,7 +538,7 @@ def _process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -558,7 +558,7 @@ def _iterate_process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
