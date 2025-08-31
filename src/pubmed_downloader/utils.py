@@ -84,6 +84,7 @@ MONTHS: dict[str, int] = {
     "Jun": 6,
     "Jul": 7,
     "Aug": 8,
+    "Sep": 9,
     "Sept": 9,
     "Oct": 10,
     "Nov": 11,
