@@ -349,13 +349,6 @@ def _parse_pub_date(element: Element) -> History:
     return History(status=status, date=parse_date(element))
 
 
-def _find_int(element: Element, key: str) -> int | None:
-    xx = element.findtext(key)
-    if xx:
-        return int(xx)
-    return None
-
-
 SKIP_PREFIXES = {"pubmed"}
 
 
