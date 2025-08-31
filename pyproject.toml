@@ -122,6 +122,7 @@ release = [
 [project.optional-dependencies]
 process = [
     "pyobo",
+    "orcid-downloader",
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
