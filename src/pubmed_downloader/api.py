@@ -169,7 +169,11 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(
-    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -179,14 +183,21 @@ def _parse_from_path(
 
     for pubmed_article in tree.findall("PubmedArticle"):
         article = _extract_article(
-            pubmed_article, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+            pubmed_article,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
         )
         if article:
             yield article
 
 
 def _extract_article(  # noqa:C901
-    element: Element, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    element: Element,
+    *,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
@@ -264,7 +275,11 @@ def _extract_article(  # noqa:C901
     authors = [
         author
         for i, author_tag in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
-        if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
+        if (
+            author := parse_author(
+                i, author_tag, ror_grounder=ror_grounder, author_grounder=author_grounder
+            )
+        )
     ]
 
     cites_pubmed_ids = [
@@ -355,6 +370,7 @@ def iterate_process_baselines(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines()
@@ -362,6 +378,7 @@ def iterate_process_baselines(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
         unit="baseline",
@@ -373,11 +390,14 @@ def _shared_process(
     *,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
 ) -> Iterable[Article]:
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+        ror_grounder, mesh_grounder, author_grounder
+    )
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -386,6 +406,7 @@ def _shared_process(
             _process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
         xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
@@ -394,6 +415,7 @@ def _shared_process(
             _iterate_process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
         xxx = map(func, tqdm(paths, **tqdm_kwargs))
@@ -424,7 +446,8 @@ def process_updates(*, force_process: bool = False) -> list[Article]:
 def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
-) -> tuple[ssslm.Grounder, ssslm.Grounder]:
+    author_grounder: ssslm.Grounder | None = None,
+) -> tuple[ssslm.Grounder, ssslm.Grounder, ssslm.Grounder]:
     if ror_grounder is None:
         import pyobo
 
@@ -435,7 +458,12 @@ def _ensure_grounders(
 
         mesh_grounder = pyobo.get_grounder("mesh")
 
-    return ror_grounder, mesh_grounder
+    if author_grounder is None:
+        from orcid_downloader.lexical import get_orcid_grounder
+
+        author_grounder = get_orcid_grounder()
+
+    return ror_grounder, mesh_grounder, author_grounder
 
 
 def iterate_process_updates(
@@ -444,6 +472,7 @@ def iterate_process_updates(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates()
@@ -452,6 +481,7 @@ def iterate_process_updates(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
         unit="updates",
@@ -472,20 +502,27 @@ def iterate_process_articles(
     force_process: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    (
+        ror_grounder,
+        mesh_grounder,
+        author_grounder,
+    ) = _ensure_grounders(ror_grounder, mesh_grounder, author_grounder)
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
     )
 
@@ -501,6 +538,7 @@ def _process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -509,6 +547,7 @@ def _process_xml_gz(
             path=path,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
     )
@@ -519,6 +558,7 @@ def _iterate_process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -532,7 +572,12 @@ def _iterate_process_xml_gz(
     else:
         with logging_redirect_tqdm():
             models = list(
-                _parse_from_path(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
+                _parse_from_path(
+                    path,
+                    ror_grounder=ror_grounder,
+                    mesh_grounder=mesh_grounder,
+                    author_grounder=author_grounder,
+                )
             )
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]

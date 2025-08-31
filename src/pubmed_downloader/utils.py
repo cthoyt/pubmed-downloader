@@ -94,7 +94,12 @@ STARTS = (
 
 
 def parse_author(  # noqa:C901
-    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder | None
+    position: int,
+    tag: Element,
+    *,
+    doc_key: int | None = None,
+    ror_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Author | Collective | None:
     """Parse an author XML object."""
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
@@ -169,6 +174,13 @@ def parse_author(  # noqa:C901
             f"Other tags to check: {remainder}"
         )
         return None
+
+    if (
+        orcid is None
+        and author_grounder
+        and (best_orcid_match := author_grounder.get_best_match(name))
+    ):
+        orcid = best_orcid_match.identifier
 
     return Author(
         position=position,
