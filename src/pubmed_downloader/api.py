@@ -77,8 +77,8 @@ def _download_updates(url: str) -> Path:
 class JournalIssue(BaseModel):
     """Represents the issue of a journal in which the article was published."""
 
-    volume: int
-    issue: int
+    volume: int | None
+    issue: str | None
     published: datetime.date
 
 
@@ -234,7 +234,8 @@ def _extract_article(  # noqa:C901
     if (journal_element := article.find("Journal")) is not None:
         if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
             volume = _find_int(journal_issue_element, "Volume")
-            issue = _find_int(journal_issue_element, "Issue")
+            # TODO create data model for issue? e.g., "1-2"
+            issue = journal_issue_element.findtext("Issue")
             if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
                 publication_date = parse_date(pubdate_element)
 
