@@ -107,7 +107,13 @@ class History(BaseModel):
     """Represents a history item."""
 
     status: Literal[
-        "received", "accepted", "pubmed", "medline", "entrez", "pmc-release", "revised",
+        "received",
+        "accepted",
+        "pubmed",
+        "medline",
+        "entrez",
+        "pmc-release",
+        "revised",
     ]
     date: datetime.date
 
@@ -336,6 +342,7 @@ def _get_journal_issue(article: Element) -> JournalIssue:
         issue=issue,
         published=publication_date,
     )
+
 
 def _parse_pub_date(element: Element) -> History:
     status = element.attrib.get("PubStatus")
