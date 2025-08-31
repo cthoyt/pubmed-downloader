@@ -178,7 +178,11 @@ def _parse_from_path(
 
 
 def _extract_article(  # noqa:C901
-    element: Element, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    element: Element,
+    *,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None = None,
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
@@ -256,7 +260,11 @@ def _extract_article(  # noqa:C901
     authors = [
         author
         for i, author_tag in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
-        if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
+        if (
+            author := parse_author(
+                i, author_tag, ror_grounder=ror_grounder, author_grounder=author_grounder
+            )
+        )
     ]
 
     cites_pubmed_ids = [

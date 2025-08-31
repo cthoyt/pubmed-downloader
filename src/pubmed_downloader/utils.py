@@ -94,7 +94,12 @@ STARTS = (
 
 
 def parse_author(  # noqa:C901
-    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder | None
+    position: int,
+    tag: Element,
+    *,
+    doc_key: int | None = None,
+    ror_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Author | Collective | None:
     """Parse an author XML object."""
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
