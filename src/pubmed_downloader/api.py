@@ -79,7 +79,7 @@ class JournalIssue(BaseModel):
 
     volume: int | None
     issue: str | None
-    published: datetime.date
+    published: datetime.date | None
 
 
 class Journal(BaseModel):
@@ -230,17 +230,6 @@ def _extract_article(  # noqa:C901
         )
         return None
 
-    volume = None
-    issue = None
-    publication_date = None
-    if (journal_element := article.find("Journal")) is not None:
-        if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
-            volume = _find_int(journal_issue_element, "Volume")
-            # TODO create data model for issue? e.g., "1-2"
-            issue = journal_issue_element.findtext("Issue")
-            if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
-                publication_date = parse_date(pubdate_element)
-
     pubmed_data = element.find("PubmedData")
     if pubmed_data is None:
         raise ValueError(f"[pubmed:{pubmed}] is missing a PubmedData tag")
@@ -312,6 +301,8 @@ def _extract_article(  # noqa:C901
         for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
     ]
 
+    journal_issue = _get_journal_issue(article)
+
     return Article(
         pubmed=pubmed,
         title=title,
@@ -325,13 +316,26 @@ def _extract_article(  # noqa:C901
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
         history=history,
-        journal_issue=JournalIssue(
-            volume=volume,
-            issue=issue,
-            published=publication_date,
-        ),
+        journal_issue=journal_issue,
     )
 
+
+def _get_journal_issue(article: Element) -> JournalIssue:
+    volume = None
+    issue = None
+    publication_date = None
+    if (journal_element := article.find("Journal")) is not None:
+        if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
+            volume = _find_int(journal_issue_element, "Volume")
+            # TODO create data model for issue? e.g., "1-2"
+            issue = journal_issue_element.findtext("Issue")
+            if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
+                publication_date = parse_date(pubdate_element)
+    return JournalIssue(
+        volume=volume,
+        issue=issue,
+        published=publication_date,
+    )
 
 def _parse_pub_date(element: Element) -> History:
     status = element.attrib.get("PubStatus")
