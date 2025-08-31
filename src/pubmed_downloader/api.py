@@ -173,7 +173,7 @@ def _parse_from_path(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -197,7 +197,7 @@ def _extract_article(  # noqa:C901
     *,
     ror_grounder: ssslm.Grounder | None,
     mesh_grounder: ssslm.Grounder | None,
-    author_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
