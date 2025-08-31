@@ -77,9 +77,9 @@ def _download_updates(url: str) -> Path:
 class JournalIssue(BaseModel):
     """Represents the issue of a journal in which the article was published."""
 
-    volume: str | None
-    issue: str | None
-    published: datetime.date | None
+    volume: str | None = None
+    issue: str | None = None
+    published: datetime.date | None = None
 
 
 class Journal(BaseModel):
@@ -115,6 +115,7 @@ class History(BaseModel):
         "pmc-release",
         "revised",
         "aheadofprint",
+        "retracted",
     ]
     date: datetime.date
 
@@ -333,7 +334,7 @@ def _get_journal_issue(article: Element) -> JournalIssue:
     publication_date = None
     if (journal_element := article.find("Journal")) is not None:
         if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
-            volume = journal_issue_element.findtext( "Volume")
+            volume = journal_issue_element.findtext("Volume")
             # TODO create data model for issue? e.g., "1-2"
             issue = journal_issue_element.findtext("Issue")
             if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
