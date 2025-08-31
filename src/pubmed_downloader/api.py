@@ -101,6 +101,13 @@ class History(BaseModel):
     status: Literal["received", "accepted", "pubmed", "medline", "entrez", "pmc-release"]
     date: datetime.date
 
+class Grant(BaseModel):
+    """Represents a grant item."""
+
+    id: str
+    acronym: str
+    agency: str # use ROR to ground agency
+    country: str
 
 #: aslo see edam:has_topic
 HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
@@ -126,6 +133,7 @@ class Article(BaseModel):
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
     history: list[History] = Field(default_factory=list)
+    grants: list[Grant] = Field(default_factory=list)
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -285,6 +293,11 @@ def _extract_article(  # noqa:C901
         for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
     ]
 
+    grants = [
+        _parse_grant(grant)
+        for grant in ...
+    ]
+
     return Article(
         pubmed=pubmed,
         title=title,
@@ -298,6 +311,7 @@ def _extract_article(  # noqa:C901
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
         history=history,
+        grants=grants,
     )
 
 
@@ -311,6 +325,8 @@ def _parse_pub_date(element: Element) -> History:
     date = datetime.date(year=year, month=month, day=day)  # type:ignore[arg-type]
     return History(status=status, date=date)
 
+def _parse_grant(element: Element) -> Grant:
+    raise NotImplementedError
 
 def _find_int(element: Element, key: str) -> int | None:
     xx = element.findtext(key)
