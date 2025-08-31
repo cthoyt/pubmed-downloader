@@ -175,7 +175,11 @@ def parse_author(  # noqa:C901
         )
         return None
 
-    if orcid is None and author_grounder and (best_orcid_match := author_grounder.get_best_match(name)):
+    if (
+        orcid is None
+        and author_grounder
+        and (best_orcid_match := author_grounder.get_best_match(name))
+    ):
         orcid = best_orcid_match.identifier
 
     return Author(

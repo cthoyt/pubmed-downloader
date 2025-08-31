@@ -6,6 +6,7 @@ from pathlib import Path
 
 from lxml import etree
 
+from pubmed_downloader import Author
 from pubmed_downloader.api import History, _extract_article
 from pubmed_downloader.client import (
     get_abstracts,
@@ -63,12 +64,25 @@ class TestEDirect(unittest.TestCase):
 
     def test_parse(self) -> None:
         """Test parsing."""
+        try:
+            from orcid_downloader.lexical import get_orcid_grounder
+        except ImportError:
+            author_grounder = None
+        else:
+            author_grounder = get_orcid_grounder()
+
         root = etree.parse(SAMPLE_PATH)
         article_element = root.find("PubmedArticle")
-        article = _extract_article(article_element, ror_grounder=None, mesh_grounder=None)
+        article = _extract_article(
+            article_element, ror_grounder=None, mesh_grounder=None, author_grounder=author_grounder
+        )
         if article is None:
             raise ValueError
         self.assertIn(
             History(status="received", date=datetime.date(year=2022, month=7, day=16)),
             article.history,
         )
+
+        author_orcids = {author.orcid for author in article.authors if isinstance(author, Author)}
+        if author_grounder is not None:
+            self.assertIn("0000-0003-4423-4370", author_orcids)

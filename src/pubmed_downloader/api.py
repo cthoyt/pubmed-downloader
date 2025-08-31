@@ -472,6 +472,7 @@ def iterate_process_updates(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates()
@@ -480,6 +481,7 @@ def iterate_process_updates(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
         unit="updates",
@@ -504,7 +506,11 @@ def iterate_process_articles(
     multiprocessing: bool = False,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    ror_grounder, mesh_grounder, author_grounder, = _ensure_grounders(ror_grounder, mesh_grounder, author_grounder)
+    (
+        ror_grounder,
+        mesh_grounder,
+        author_grounder,
+    ) = _ensure_grounders(ror_grounder, mesh_grounder, author_grounder)
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
