@@ -231,12 +231,12 @@ def _extract_article(  # noqa:C901
     volume = None
     issue = None
     publication_date = None
-    if journal := article.find("Journal"):
-        if journal_issue := journal.find("JournalIssue"):
-            volume = _find_int(journal_issue, "Volume")
-            issue = _find_int(journal_issue, "Issue")
-            if pubdate := journal_issue.find("PubDate"):
-                publication_date = parse_date(pubdate)
+    if journal_element := article.find("Journal"):
+        if journal_issue_element := journal_element.find("JournalIssue"):
+            volume = _find_int(journal_issue_element, "Volume")
+            issue = _find_int(journal_issue_element, "Issue")
+            if pubdate_element := journal_issue_element.find("PubDate"):
+                publication_date = parse_date(pubdate_element)
 
     pubmed_data = element.find("PubmedData")
     if pubmed_data is None:
