@@ -76,4 +76,4 @@ class TestEDirect(unittest.TestCase):
         # parsing out journal issue information
         self.assertEqual(datetime.date(year=2022, month=11, day=19), article.date_published)
         self.assertEqual(9, article.journal_issue.volume)
-        self.assertEqual(1, article.journal_issue.issue)
+        self.assertEqual("1", article.journal_issue.issue)
