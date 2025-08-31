@@ -66,7 +66,7 @@ class TestEDirect(unittest.TestCase):
         root = etree.parse(SAMPLE_PATH)
         article_element = root.find("PubmedArticle")
         article = _extract_article(article_element, ror_grounder=None, mesh_grounder=None)
-        if article_element is None:
+        if article is None:
             raise ValueError
         self.assertIn(
             History(status="received", date=datetime.date(year=2022, month=7, day=16)),

@@ -304,12 +304,22 @@ def _extract_article(  # noqa:C901
     )
 
 
-def _parse_pub_date(x) -> History:
-    status = x.attrib.get("PubStatus")
-    year = int(x.findtext("Year"))
-    month = int(x.findtext("Month"))
-    day = int(x.findtext("Day"))
-    return History(status=status, date=datetime.date(year=year, month=month, day=day))
+def _parse_pub_date(element: Element) -> History:
+    status = element.attrib.get("PubStatus")
+    year = _find_int(element, "Year")
+    if year is None:
+        raise ValueError
+    month = _find_int(element, "Month")
+    day = _find_int(element, "Day")
+    date = datetime.date(year=year, month=month, day=day)  # type:ignore[arg-type]
+    return History(status=status, date=date)
+
+
+def _find_int(element: Element, key: str) -> int | None:
+    xx = element.findtext(key)
+    if xx:
+        return int(xx)
+    return None
 
 
 SKIP_PREFIXES = {"pubmed"}
