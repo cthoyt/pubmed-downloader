@@ -145,7 +145,7 @@ class Article(BaseModel):
     history: list[History] = Field(default_factory=list)
 
     @property
-    def date_published(self) -> datetime.date:
+    def date_published(self) -> datetime.date | None:
         """Get the date published from the journal issue."""
         return self.journal_issue.published
 
