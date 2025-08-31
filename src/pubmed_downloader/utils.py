@@ -57,10 +57,38 @@ def parse_date(date_tag: Element | None) -> datetime.date | None:
         return None
     year = int(year_tag.text)
     month_tag = date_tag.find("Month")
-    month = int(month_tag.text) if month_tag is not None and month_tag.text else None
+    if month_tag is not None and (month_text := month_tag.text):
+        month = _handle_month(month_text)
+    else:
+        month = None
     day_tag = date_tag.find("Day")
     day = int(day_tag.text) if day_tag is not None and day_tag.text else None
     return datetime.date(year=year, month=month, day=day)  # type:ignore
+
+
+def _handle_month(month_text: str) -> int | None:
+    if month_text.isnumeric():
+        return int(month_text)
+    if month_text in MONTHS:
+        return MONTHS[month_text]
+    logger.warning("unhandled month: %s", month_text)
+    return None
+
+
+MONTHS: dict[str, int] = {
+    "Jan": 1,
+    "Feb": 2,
+    "Mar": 3,
+    "Apr": 4,
+    "May": 5,
+    "Jun": 6,
+    "Jul": 7,
+    "Aug": 8,
+    "Sept": 9,
+    "Oct": 10,
+    "Nov": 11,
+    "Dec": 12,
+}
 
 
 class Author(BaseModel):

@@ -74,6 +74,14 @@ def _download_updates(url: str) -> Path:
     return UPDATES_MODULE.ensure(url=url)
 
 
+class JournalIssue(BaseModel):
+    """Represents the issue of a journal in which the article was published."""
+
+    volume: int
+    issue: int
+    published: datetime.date
+
+
 class Journal(BaseModel):
     """Represents a reference to a journal.
 
@@ -121,11 +129,17 @@ class Article(BaseModel):
     )
     headings: list[Heading] = Field(default_factory=list)
     journal: Journal
+    journal_issue: JournalIssue
     abstract: list[AbstractText] = Field(default_factory=list)
     authors: list[Author | Collective] = Field(default_factory=list)
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
     history: list[History] = Field(default_factory=list)
+
+    @property
+    def date_published(self) -> datetime.date:
+        """Get the date published from the journal issue."""
+        return self.journal_issue.published
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -214,6 +228,16 @@ def _extract_article(  # noqa:C901
         )
         return None
 
+    volume = None
+    issue = None
+    publication_date = None
+    if journal := article.find("Journal"):
+        if journal_issue := journal.find("JournalIssue"):
+            volume = _find_int(journal_issue, "Volume")
+            issue = _find_int(journal_issue, "Issue")
+            if pubdate := journal_issue.find("PubDate"):
+                publication_date = parse_date(pubdate)
+
     pubmed_data = element.find("PubmedData")
     if pubmed_data is None:
         raise ValueError(f"[pubmed:{pubmed}] is missing a PubmedData tag")
@@ -298,18 +322,17 @@ def _extract_article(  # noqa:C901
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
         history=history,
+        journal_issue=JournalIssue(
+            volume=volume,
+            issue=issue,
+            published=publication_date,
+        ),
     )
 
 
 def _parse_pub_date(element: Element) -> History:
     status = element.attrib.get("PubStatus")
-    year = _find_int(element, "Year")
-    if year is None:
-        raise ValueError
-    month = _find_int(element, "Month")
-    day = _find_int(element, "Day")
-    date = datetime.date(year=year, month=month, day=day)  # type:ignore[arg-type]
-    return History(status=status, date=date)
+    return History(status=status, date=parse_date(element))
 
 
 def _find_int(element: Element, key: str) -> int | None:
