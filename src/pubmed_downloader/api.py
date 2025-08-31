@@ -116,6 +116,7 @@ class History(BaseModel):
         "revised",
         "aheadofprint",
         "retracted",
+        "ecollection",
     ]
     date: datetime.date
 
