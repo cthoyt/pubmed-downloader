@@ -106,7 +106,9 @@ class AbstractText(BaseModel):
 class History(BaseModel):
     """Represents a history item."""
 
-    status: Literal["received", "accepted", "pubmed", "medline", "entrez", "pmc-release"]
+    status: Literal[
+        "received", "accepted", "pubmed", "medline", "entrez", "pmc-release", "revised",
+    ]
     date: datetime.date
 
 
