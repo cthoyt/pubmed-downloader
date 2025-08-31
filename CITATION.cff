@@ -3,6 +3,6 @@ message: "If you use this software, please cite it as below."
 title: "PubMed Downloader"
 authors:
   - name: "Charles Tapley Hoyt"
-version: 0.0.12
+version: 0.0.13-dev
 doi:
 url: "https://github.com/cthoyt/pubmed-downloader"
