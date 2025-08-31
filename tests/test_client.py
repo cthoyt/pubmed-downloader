@@ -1,5 +1,6 @@
 """Test eDirect utilities."""
 
+import datetime
 import unittest
 from pathlib import Path
 
@@ -10,6 +11,11 @@ from pubmed_downloader.client import (
     search_with_api,
     search_with_edirect,
 )
+from lxml import etree
+from pubmed_downloader.api import _extract_article, History
+
+HERE = Path(__file__).parent.resolve()
+SAMPLE_PATH = HERE.joinpath("sample.xml")
 
 
 class TestEDirect(unittest.TestCase):
@@ -53,3 +59,14 @@ class TestEDirect(unittest.TestCase):
             "Here we derive mathematical conditions for the identifiability of disease", a1
         )
         self.assertIn("Extensive experimental animal studies and epidemiological obse", a2)
+
+    def test_parse(self) -> None:
+        """Test parsing."""
+        root = etree.parse(SAMPLE_PATH)
+        article_element = root.find("PubmedArticle")
+        article = _extract_article(article_element)
+        self.assertIsNotNone(article)
+        self.assertIn(
+            History(status="received", date=datetime.date(year=2022, month=7, day=16)),
+            article.history,
+        )

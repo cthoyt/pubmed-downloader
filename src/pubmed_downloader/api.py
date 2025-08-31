@@ -10,7 +10,7 @@ import json
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
 import click
@@ -95,6 +95,13 @@ class AbstractText(BaseModel):
     category: str | None = None
 
 
+class History(BaseModel):
+    """Represents a history item."""
+
+    status: Literal["received", "accepted", "pubmed", "medline", "entrez", "pmc-release"]
+    date: datetime.date
+
+
 #: aslo see edam:has_topic
 HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
 #: also see biolink:published_in, EFO:0001796
@@ -118,6 +125,7 @@ class Article(BaseModel):
     authors: list[Author | Collective]
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
+    history: list[History] = Field(default_factory=list)
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -178,7 +186,10 @@ def _parse_from_path(
 
 
 def _extract_article(  # noqa:C901
-    element: Element, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    element: Element,
+    *,
+    ror_grounder: ssslm.Grounder | None = None,
+    mesh_grounder: ssslm.Grounder | None = None,
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
@@ -272,6 +283,11 @@ def _extract_article(  # noqa:C901
         if article_id_tag.text and (prefix := article_id_tag.attrib["IdType"]) not in SKIP_PREFIXES
     ]
 
+    history = [
+        _parse_pub_date(pubmed_date)
+        for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
+    ]
+
     return Article(
         pubmed=pubmed,
         title=title,
@@ -284,7 +300,16 @@ def _extract_article(  # noqa:C901
         authors=authors,
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
+        history=history,
     )
+
+
+def _parse_pub_date(x) -> History:
+    status = x.attrib.get("PubStatus")
+    year = int(x.findtext("Year"))
+    month = int(x.findtext("Month"))
+    day = int(x.findtext("Day"))
+    return History(status=status, date=datetime.date(year=year, month=month, day=day))
 
 
 SKIP_PREFIXES = {"pubmed"}
