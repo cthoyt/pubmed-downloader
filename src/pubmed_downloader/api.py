@@ -306,8 +306,9 @@ def _extract_article(  # noqa:C901
     ]
 
     history = [
-        _parse_pub_date(pubmed_date)
+        history
         for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
+        if (history := _parse_pub_date(pubmed_date))
     ]
 
     journal_issue = _get_journal_issue(article)
@@ -347,10 +348,21 @@ def _get_journal_issue(article: Element) -> JournalIssue:
     )
 
 
-def _parse_pub_date(element: Element) -> History:
+def _parse_pub_date(element: Element) -> History | None:
     status = element.attrib.get("PubStatus")
-    return History(status=status, date=parse_date(element))
-
+    if status is None:
+        tqdm.write(f'missing status: {etree.tostring(element)}')
+        return None
+    date = parse_date(element)
+    if date is None:
+        return None
+    try:
+        rv = History(status=status, date=date)
+    except ValueError:
+        tqdm.write(f"invalid status: {status}")
+        return None
+    else:
+        return rv
 
 SKIP_PREFIXES = {"pubmed"}
 
