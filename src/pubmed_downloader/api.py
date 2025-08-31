@@ -114,6 +114,7 @@ class History(BaseModel):
         "entrez",
         "pmc-release",
         "revised",
+        "aheadofprint",
     ]
     date: datetime.date
 
