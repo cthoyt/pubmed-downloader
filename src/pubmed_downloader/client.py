@@ -380,6 +380,7 @@ class InvalidErrorStrategyError(ValueError):
     """Raised when passing an invalid error strategy."""
 
     def __init__(self, value: str) -> None:
+        """Initialize the value error."""
         self.value = value
 
     def __repr__(self) -> str:
