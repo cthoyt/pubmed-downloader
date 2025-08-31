@@ -161,7 +161,11 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(
-    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder | None,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -171,7 +175,10 @@ def _parse_from_path(
 
     for pubmed_article in tree.findall("PubmedArticle"):
         article = _extract_article(
-            pubmed_article, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+            pubmed_article,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
         )
         if article:
             yield article
@@ -349,11 +356,14 @@ def _shared_process(
     *,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
 ) -> Iterable[Article]:
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+        ror_grounder, mesh_grounder, author_grounder
+    )
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -362,6 +372,7 @@ def _shared_process(
             _process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
         xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
@@ -370,6 +381,7 @@ def _shared_process(
             _iterate_process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
         xxx = map(func, tqdm(paths, **tqdm_kwargs))
@@ -400,7 +412,8 @@ def process_updates(*, force_process: bool = False) -> list[Article]:
 def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
-) -> tuple[ssslm.Grounder, ssslm.Grounder]:
+    author_grounder: ssslm.Grounder | None = None,
+) -> tuple[ssslm.Grounder, ssslm.Grounder, ssslm.Grounder | None]:
     if ror_grounder is None:
         import pyobo
 
@@ -411,7 +424,12 @@ def _ensure_grounders(
 
         mesh_grounder = pyobo.get_grounder("mesh")
 
-    return ror_grounder, mesh_grounder
+    if author_grounder is None:
+        from orcid_downloader.lexical import get_orcid_grounder
+
+        author_grounder = get_orcid_grounder()
+
+    return ror_grounder, mesh_grounder, author_grounder
 
 
 def iterate_process_updates(
@@ -477,6 +495,7 @@ def _process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -485,6 +504,7 @@ def _process_xml_gz(
             path=path,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
     )
@@ -495,6 +515,7 @@ def _iterate_process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -508,7 +529,12 @@ def _iterate_process_xml_gz(
     else:
         with logging_redirect_tqdm():
             models = list(
-                _parse_from_path(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
+                _parse_from_path(
+                    path,
+                    ror_grounder=ror_grounder,
+                    mesh_grounder=mesh_grounder,
+                    author_grounder=author_grounder,
+                )
             )
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
