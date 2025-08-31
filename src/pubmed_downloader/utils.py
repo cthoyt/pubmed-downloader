@@ -63,7 +63,8 @@ def parse_date(date_tag: Element | None) -> datetime.date | None:
         month = None
     day_tag = date_tag.find("Day")
     day = int(day_tag.text) if day_tag is not None and day_tag.text else None
-    return datetime.date(year=year, month=month, day=day)  # type:ignore
+
+    return datetime.date(year=year, month=month or 1, day=day or 1)
 
 
 def _handle_month(month_text: str) -> int | None:
