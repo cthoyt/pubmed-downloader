@@ -185,17 +185,14 @@ class Article(BaseModel):
 
 def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
     if cache_path.is_file() and not force:
-        return cache_path.read_text().splitlines()
+        text = cache_path.read_text()
+    else:
+        res = requests.get(url, timeout=300)
+        res.raise_for_status()
+        text = res.text
+        cache_path.write_text(text)
 
-    rv = _get_urls(url)
-    cache_path.write_text("\n".join(rv))
-    return rv
-
-
-def _get_urls(url: str) -> list[str]:
-    res = requests.get(url, timeout=300)
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, "html.parser")
+    soup = BeautifulSoup(text, "html.parser")
     return sorted(
         (
             url + href  # type:ignore
@@ -553,7 +550,7 @@ def iterate_process_updates(
         author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
-        unit="updates",
+        unit="update",
     )
 
 
