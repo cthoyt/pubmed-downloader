@@ -78,6 +78,14 @@ def _download_updates(url: str) -> Path:
     return UPDATES_MODULE.ensure(url=url)
 
 
+class JournalIssue(BaseModel):
+    """Represents the issue of a journal in which the article was published."""
+
+    volume: str | None = None
+    issue: str | None = None
+    published: datetime.date | None = None
+
+
 class Journal(BaseModel):
     """Represents a reference to a journal.
 
@@ -102,7 +110,18 @@ class AbstractText(BaseModel):
 class History(BaseModel):
     """Represents a history item."""
 
-    status: Literal["received", "accepted", "pubmed", "medline", "entrez", "pmc-release", "revised"]
+    status: Literal[
+        "received",
+        "accepted",
+        "pubmed",
+        "medline",
+        "entrez",
+        "pmc-release",
+        "revised",
+        "aheadofprint",
+        "retracted",
+        "ecollection",
+    ]
     date: datetime.date
 
 
@@ -125,11 +144,17 @@ class Article(BaseModel):
     )
     headings: list[Heading] = Field(default_factory=list)
     journal: Journal
+    journal_issue: JournalIssue
     abstract: list[AbstractText] = Field(default_factory=list)
     authors: list[Author | Collective] = Field(default_factory=list)
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
     history: list[History] = Field(default_factory=list)
+
+    @property
+    def date_published(self) -> datetime.date | None:
+        """Get the date published from the journal issue."""
+        return self.journal_issue.published
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -309,9 +334,12 @@ def _extract_article(  # noqa:C901
     ]
 
     history = [
-        _parse_pub_date(pubmed_date)
+        history
         for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
+        if (history := _parse_pub_date(pubmed_date))
     ]
+
+    journal_issue = _get_journal_issue(article)
 
     return Article(
         pubmed=pubmed,
@@ -326,25 +354,43 @@ def _extract_article(  # noqa:C901
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
         history=history,
+        journal_issue=journal_issue,
     )
 
 
-def _parse_pub_date(element: Element) -> History:
+def _get_journal_issue(article: Element) -> JournalIssue:
+    volume = None
+    issue = None
+    publication_date = None
+    if (journal_element := article.find("Journal")) is not None:
+        if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
+            volume = journal_issue_element.findtext("Volume")
+            # TODO create data model for issue? e.g., "1-2"
+            issue = journal_issue_element.findtext("Issue")
+            if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
+                publication_date = parse_date(pubdate_element)
+    return JournalIssue(
+        volume=volume,
+        issue=issue,
+        published=publication_date,
+    )
+
+
+def _parse_pub_date(element: Element) -> History | None:
     status = element.attrib.get("PubStatus")
-    year = _find_int(element, "Year")
-    if year is None:
-        raise ValueError
-    month = _find_int(element, "Month")
-    day = _find_int(element, "Day")
-    date = datetime.date(year=year, month=month, day=day)  # type:ignore[arg-type]
-    return History(status=status, date=date)
-
-
-def _find_int(element: Element, key: str) -> int | None:
-    xx = element.findtext(key)
-    if xx:
-        return int(xx)
-    return None
+    if status is None:
+        tqdm.write(f"missing status: {etree.tostring(element)}")
+        return None
+    date = parse_date(element)
+    if date is None:
+        return None
+    try:
+        rv = History(status=status, date=date)
+    except ValueError:
+        tqdm.write(f"invalid status: {status}")
+        return None
+    else:
+        return rv
 
 
 SKIP_PREFIXES = {"pubmed"}

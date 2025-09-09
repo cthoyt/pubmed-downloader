@@ -86,3 +86,8 @@ class TestEDirect(unittest.TestCase):
         author_orcids = {author.orcid for author in article.authors if isinstance(author, Author)}
         if author_grounder is not None:
             self.assertIn("0000-0003-4423-4370", author_orcids)
+
+        # parsing out journal issue information
+        self.assertEqual(datetime.date(year=2022, month=11, day=19), article.date_published)
+        self.assertEqual("9", article.journal_issue.volume)
+        self.assertEqual("1", article.journal_issue.issue)
