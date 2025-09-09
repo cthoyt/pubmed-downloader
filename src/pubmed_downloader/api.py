@@ -489,7 +489,7 @@ def ensure_updates(*, force: bool) -> list[Path]:
     return list(iterate_ensure_updates(force=force))
 
 
-def iterate_ensure_updates(*, force: bool) -> Iterable[Path]:
+def iterate_ensure_updates(*, force: bool = False) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
     urls = _ensure_urls(UPDATES_URL, UPDATES_PATH, force=force)
     yield from thread_map(
@@ -606,10 +606,10 @@ def iterate_process_articles(
     )
 
 
-def iterate_ensure_articles() -> Iterable[Path]:
+def iterate_ensure_articles(*, force: bool = False) -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_updates()
-    yield from iterate_ensure_baselines()
+    yield from iterate_ensure_updates(force=force)
+    yield from iterate_ensure_baselines(force=force)
 
 
 def _process_xml_gz(
@@ -666,7 +666,7 @@ def _iterate_process_xml_gz(
         yield from models
 
 
-def get_edges(*, force_process: bool = False, **kwargs) -> list[Triple]:
+def get_edges(*, force_process: bool = False, **kwargs: Any) -> list[Triple]:
     """Get edges from PubMed."""
     if EDGES_PATH.is_file() and not force_process:
         return read_triples(EDGES_PATH)
@@ -696,7 +696,7 @@ def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> Non
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
 @click.option("--test", is_flag=True, help="Run a test file")
-@verbose_option
+@verbose_option  # type:ignore[misc]
 def _main(force_process: bool, multiprocessing: bool, test: bool) -> None:
     """Download and process articles."""
     save_sssom(
