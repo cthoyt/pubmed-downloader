@@ -101,13 +101,16 @@ class History(BaseModel):
     status: Literal["received", "accepted", "pubmed", "medline", "entrez", "pmc-release"]
     date: datetime.date
 
+
 class Grant(BaseModel):
     """Represents a grant item."""
 
     id: str
     acronym: str
-    agency: str # use ROR to ground agency
-    country: str
+    agency: str  # use ROR to ground agency
+    agency_reference: str | None = None
+    country: str  # TODO use pydantic validation
+
 
 #: aslo see edam:has_topic
 HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
@@ -275,6 +278,11 @@ def _extract_article(  # noqa:C901
         if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
     ]
 
+    grants = [
+        _parse_grant(grant, ror_grounder=ror_grounder)
+        for grant in medline_citation.findall("..//GrantList/Grant")
+    ]
+
     cites_pubmed_ids = [
         cites_pubmed_id
         for citation_reference_tag in medline_citation.findall(".//ReferenceList/Reference")
@@ -291,11 +299,6 @@ def _extract_article(  # noqa:C901
     history = [
         _parse_pub_date(pubmed_date)
         for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
-    ]
-
-    grants = [
-        _parse_grant(grant)
-        for grant in ...
     ]
 
     return Article(
@@ -325,8 +328,24 @@ def _parse_pub_date(element: Element) -> History:
     date = datetime.date(year=year, month=month, day=day)  # type:ignore[arg-type]
     return History(status=status, date=date)
 
-def _parse_grant(element: Element) -> Grant:
-    raise NotImplementedError
+
+def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
+    grant_id = element.findtext("GrantID")
+    acronym = element.findtext("Acronym")
+    agency = element.findtext("Agency")
+    if ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
+        agency_reference = match.reference
+    else:
+        agency_reference = None
+    country = element.findtext("Country")
+    return Grant(
+        id=grant_id,
+        acronym=acronym,
+        agency=agency,
+        agency_reference=agency_reference,
+        country=country,
+    )
+
 
 def _find_int(element: Element, key: str) -> int | None:
     xx = element.findtext(key)

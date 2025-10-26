@@ -6,7 +6,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from pubmed_downloader.api import History, _extract_article
+from pubmed_downloader.api import Grant, History, _extract_article
 from pubmed_downloader.client import (
     get_abstracts,
     get_edirect_directory,
@@ -71,4 +71,8 @@ class TestEDirect(unittest.TestCase):
         self.assertIn(
             History(status="received", date=datetime.date(year=2022, month=7, day=16)),
             article.history,
+        )
+        self.assertIn(
+            Grant(id="R24 OD011883", acronym="OD", agency="NIH HHS", country="United States"),
+            article.grants,
         )
