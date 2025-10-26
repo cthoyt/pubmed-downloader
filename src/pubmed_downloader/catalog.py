@@ -730,7 +730,7 @@ def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iter
     res = requests.get(base, timeout=300)
     soup = BeautifulSoup(res.text, "html.parser")
     for link in soup.find_all("a"):
-        href = link.attrs["href"]  # type:ignore
+        href = link.attrs["href"]
         if not isinstance(href, str) or not href:
             tqdm.write(f"link: {link}")
             continue

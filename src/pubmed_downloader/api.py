@@ -329,24 +329,6 @@ def _parse_pub_date(element: Element) -> History:
     return History(status=status, date=date)
 
 
-def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
-    grant_id = element.findtext("GrantID")
-    acronym = element.findtext("Acronym")
-    agency = element.findtext("Agency")
-    if ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
-        agency_reference = match.reference
-    else:
-        agency_reference = None
-    country = element.findtext("Country")
-    return Grant(
-        id=grant_id,
-        acronym=acronym,
-        agency=agency,
-        agency_reference=agency_reference,
-        country=country,
-    )
-
-
 def _find_int(element: Element, key: str) -> int | None:
     xx = element.findtext(key)
     if xx:
@@ -362,6 +344,24 @@ def _parse_reference(reference_tag: Element) -> str | None:
         if article_id_tag.attrib["IdType"] == "pubmed":
             return article_id_tag.text
     return None
+
+
+def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
+    grant_id = element.findtext("GrantID")
+    acronym = element.findtext("Acronym")
+    agency = element.findtext("Agency")
+    if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
+        agency_reference = match.reference
+    else:
+        agency_reference = None
+    country = element.findtext("Country")
+    return Grant(
+        id=grant_id,
+        acronym=acronym,
+        agency=agency,
+        agency_reference=agency_reference,
+        country=country,
+    )
 
 
 def ensure_baselines() -> list[Path]:
