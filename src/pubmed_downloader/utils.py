@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import re
+from collections.abc import Iterable
 from typing import Any, Literal
 from xml.etree.ElementTree import Element
 
@@ -16,6 +17,7 @@ from tqdm import tqdm
 
 __all__ = [
     "MODULE",
+    "clean_pubmed_ids",
     "parse_date",
 ]
 
@@ -55,10 +57,45 @@ def parse_date(date_tag: Element | None) -> datetime.date | None:
         return None
     year = int(year_tag.text)
     month_tag = date_tag.find("Month")
-    month = int(month_tag.text) if month_tag is not None and month_tag.text else None
+    if month_tag is not None and (month_text := month_tag.text):
+        month = _handle_month(month_text)
+    else:
+        month = None
     day_tag = date_tag.find("Day")
     day = int(day_tag.text) if day_tag is not None and day_tag.text else None
-    return datetime.date(year=year, month=month, day=day)  # type:ignore
+    try:
+        rv = datetime.date(year=year, month=month or 1, day=day or 1)
+    except ValueError:
+        tqdm.write(f"failed to parse {year=} {month=} {day=}")
+        return None
+    else:
+        return rv
+
+
+def _handle_month(month_text: str) -> int | None:
+    if month_text.isnumeric():
+        return int(month_text)
+    if month_text in MONTHS:
+        return MONTHS[month_text]
+    logger.warning("unhandled month: %s", month_text)
+    return None
+
+
+MONTHS: dict[str, int] = {
+    "Jan": 1,
+    "Feb": 2,
+    "Mar": 3,
+    "Apr": 4,
+    "May": 5,
+    "Jun": 6,
+    "Jul": 7,
+    "Aug": 8,
+    "Sep": 9,
+    "Sept": 9,
+    "Oct": 10,
+    "Nov": 11,
+    "Dec": 12,
+}
 
 
 class Author(BaseModel):
@@ -92,7 +129,7 @@ STARTS = (
 
 
 def parse_author(  # noqa:C901
-    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder
+    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder | None
 ) -> Author | Collective | None:
     """Parse an author XML object."""
     affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
@@ -121,7 +158,7 @@ def parse_author(  # noqa:C901
 
     if collective_name_tag is not None and collective_name_tag.text:
         name = collective_name_tag.text.rstrip(".")
-        match = ror_grounder.get_best_match(name)
+        match = ror_grounder.get_best_match(name) if ror_grounder is not None else None
         return Collective(
             position=position, name=name, reference=match.reference if match else None, roles=roles
         )
@@ -199,7 +236,7 @@ MESH_MISSES: set[str] = set()
 
 
 def parse_mesh_heading(
-    mesh_heading_tag: Element, *, mesh_grounder: ssslm.Grounder
+    mesh_heading_tag: Element, *, mesh_grounder: ssslm.Grounder | None
 ) -> Heading | None:
     """Parse a MeSH heading."""
     descriptor_name_tag = mesh_heading_tag.find("DescriptorName")
@@ -212,7 +249,11 @@ def parse_mesh_heading(
     if not descriptor_name and not descriptor_mesh_id:
         return None
     elif descriptor_name and not descriptor_mesh_id:
-        best_match = mesh_grounder.get_best_match(descriptor_name.rstrip("."))
+        best_match = (
+            mesh_grounder.get_best_match(descriptor_name.rstrip("."))
+            if mesh_grounder is not None
+            else None
+        )
         if best_match is not None:
             descriptor_mesh_id = best_match.identifier
         else:
@@ -299,3 +340,14 @@ def _json_default(o: Any) -> Any:
     if isinstance(o, datetime.date | datetime.datetime):
         return o.isoformat()
     return o
+
+
+def clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:
+    """Clean a list of PubMed identifiers."""
+    for pubmed_id in pubmed_ids:
+        if isinstance(pubmed_id, int):
+            yield str(pubmed_id)
+        elif isinstance(pubmed_id, str):
+            yield str(int(pubmed_id.strip()))
+        else:
+            raise TypeError

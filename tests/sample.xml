@@ -1,0 +1,884 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2025//EN"
+        "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_250101.dtd">
+<PubmedArticleSet>
+    <PubmedArticle>
+        <MedlineCitation Status="PubMed-not-MEDLINE" Owner="NLM">
+            <PMID Version="1">36402838</PMID>
+            <DateCompleted>
+                <Year>2022</Year>
+                <Month>11</Month>
+                <Day>23</Day>
+            </DateCompleted>
+            <DateRevised>
+                <Year>2024</Year>
+                <Month>09</Month>
+                <Day>07</Day>
+            </DateRevised>
+            <Article PubModel="Electronic">
+                <Journal>
+                    <ISSN IssnType="Electronic">2052-4463</ISSN>
+                    <JournalIssue CitedMedium="Internet">
+                        <Volume>9</Volume>
+                        <Issue>1</Issue>
+                        <PubDate>
+                            <Year>2022</Year>
+                            <Month>Nov</Month>
+                            <Day>19</Day>
+                        </PubDate>
+                    </JournalIssue>
+                    <Title>Scientific data</Title>
+                    <ISOAbbreviation>Sci Data</ISOAbbreviation>
+                </Journal>
+                <ArticleTitle>Unifying the identification of biomedical entities with the Bioregistry.</ArticleTitle>
+                <Pagination>
+                    <StartPage>714</StartPage>
+                    <MedlinePgn>714</MedlinePgn>
+                </Pagination>
+                <ELocationID EIdType="pii" ValidYN="Y">714</ELocationID>
+                <ELocationID EIdType="doi" ValidYN="Y">10.1038/s41597-022-01807-3</ELocationID>
+                <Abstract>
+                    <AbstractText>The standardized identification of biomedical entities is a cornerstone of
+                        interoperability, reuse, and data integration in the life sciences. Several registries have been
+                        developed to catalog resources maintaining identifiers for biomedical entities such as small
+                        molecules, proteins, cell lines, and clinical trials. However, existing registries have
+                        struggled to provide sufficient coverage and metadata standards that meet the evolving needs of
+                        modern life sciences researchers. Here, we introduce the Bioregistry, an integrative, open,
+                        community-driven metaregistry that synthesizes and substantially expands upon 23 existing
+                        registries. The Bioregistry addresses the need for a sustainable registry by leveraging public
+                        infrastructure and automation, and employing a progressive governance model centered around open
+                        code and open data to foster community contribution. The Bioregistry can be used to support the
+                        standardized annotation of data, models, ontologies, and scientific literature, thereby
+                        promoting their interoperability and reuse. The Bioregistry can be accessed through
+                        https://bioregistry.io and its source code and data are available under the MIT and CC0 Licenses
+                        at https://github.com/biopragmatics/bioregistry .
+                    </AbstractText>
+                    <CopyrightInformation>&#xa9; 2022. The Author(s).</CopyrightInformation>
+                </Abstract>
+                <AuthorList CompleteYN="Y">
+                    <Author ValidYN="Y">
+                        <LastName>Hoyt</LastName>
+                        <ForeName>Charles Tapley</ForeName>
+                        <Initials>CT</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Laboratory of Systems Pharmacology, Harvard Medical School, Boston, USA.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Balk</LastName>
+                        <ForeName>Meghan</ForeName>
+                        <Initials>M</Initials>
+                        <Identifier Source="ORCID">0000-0003-2699-3066</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>University of Arizona, Tucson, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Callahan</LastName>
+                        <ForeName>Tiffany J</ForeName>
+                        <Initials>TJ</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>University of Colorado Anschutz Medical Campus, Aurora, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Domingo-Fern&#xe1;ndez</LastName>
+                        <ForeName>Daniel</ForeName>
+                        <Initials>D</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Department of Bioinformatics, Fraunhofer SCAI, Sankt Augustin, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                        <AffiliationInfo>
+                            <Affiliation>Enveda Biosciences, Boulder, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Haendel</LastName>
+                        <ForeName>Melissa A</ForeName>
+                        <Initials>MA</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>University of Colorado Anschutz Medical Campus, Aurora, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Hegde</LastName>
+                        <ForeName>Harshad B</ForeName>
+                        <Initials>HB</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Lawrence Berkeley National Laboratory, Berkeley, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Himmelstein</LastName>
+                        <ForeName>Daniel S</ForeName>
+                        <Initials>DS</Initials>
+                        <Identifier Source="ORCID">0000-0002-3012-7446</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>Related Sciences, Denver, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Karis</LastName>
+                        <ForeName>Klas</ForeName>
+                        <Initials>K</Initials>
+                        <Identifier Source="ORCID">0000-0003-1699-7776</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>Laboratory of Systems Pharmacology, Harvard Medical School, Boston, USA.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Kunze</LastName>
+                        <ForeName>John</ForeName>
+                        <Initials>J</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>California Digital Library, University of California, Berkeley, USA.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Lubiana</LastName>
+                        <ForeName>Tiago</ForeName>
+                        <Initials>T</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>School of Pharmaceutical Sciences, University of S&#xe3;o Paulo, S&#xe3;o
+                                Paulo, Brazil.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Matentzoglu</LastName>
+                        <ForeName>Nicolas</ForeName>
+                        <Initials>N</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Semanticly, London, UK.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>McMurry</LastName>
+                        <ForeName>Julie</ForeName>
+                        <Initials>J</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>University of Colorado Anschutz Medical Campus, Aurora, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Moxon</LastName>
+                        <ForeName>Sierra</ForeName>
+                        <Initials>S</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Lawrence Berkeley National Laboratory, Berkeley, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Mungall</LastName>
+                        <ForeName>Christopher J</ForeName>
+                        <Initials>CJ</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Lawrence Berkeley National Laboratory, Berkeley, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Rutz</LastName>
+                        <ForeName>Adriano</ForeName>
+                        <Initials>A</Initials>
+                        <Identifier Source="ORCID">0000-0003-0443-9902</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>School of Pharmaceutical Sciences, University of Geneva, Geneva, Switzerland.
+                            </Affiliation>
+                        </AffiliationInfo>
+                        <AffiliationInfo>
+                            <Affiliation>Institute of Pharmaceutical Sciences of Western Switzerland, University of
+                                Geneva, Geneva, Switzerland.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Unni</LastName>
+                        <ForeName>Deepak R</ForeName>
+                        <Initials>DR</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Lawrence Berkeley National Laboratory, Berkeley, USA.</Affiliation>
+                        </AffiliationInfo>
+                        <AffiliationInfo>
+                            <Affiliation>European Molecular Biology Laboratory, Heidelberg, Germany.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Willighagen</LastName>
+                        <ForeName>Egon</ForeName>
+                        <Initials>E</Initials>
+                        <Identifier Source="ORCID">0000-0001-7542-0286</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>Department of Bioinformatics - BiGCaT, NUTRIM, Maastricht University,
+                                Maastricht, Netherlands.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Winston</LastName>
+                        <ForeName>Donald</ForeName>
+                        <Initials>D</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Polyneme LLC, New York, USA.</Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Gyori</LastName>
+                        <ForeName>Benjamin M</ForeName>
+                        <Initials>BM</Initials>
+                        <Identifier Source="ORCID">0000-0001-9439-5346</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>Laboratory of Systems Pharmacology, Harvard Medical School, Boston, USA.
+                                benjamin_gyori@hms.harvard.edu.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                </AuthorList>
+                <Language>eng</Language>
+                <GrantList CompleteYN="Y">
+                    <Grant>
+                        <GrantID>R24 OD011883</GrantID>
+                        <Acronym>OD</Acronym>
+                        <Agency>NIH HHS</Agency>
+                        <Country>United States</Country>
+                    </Grant>
+                    <Grant>
+                        <GrantID>RM1 HG010860</GrantID>
+                        <Acronym>HG</Acronym>
+                        <Agency>NHGRI NIH HHS</Agency>
+                        <Country>United States</Country>
+                    </Grant>
+                </GrantList>
+                <PublicationTypeList>
+                    <PublicationType UI="D016428">Journal Article</PublicationType>
+                </PublicationTypeList>
+                <ArticleDate DateType="Electronic">
+                    <Year>2022</Year>
+                    <Month>11</Month>
+                    <Day>19</Day>
+                </ArticleDate>
+            </Article>
+            <MedlineJournalInfo>
+                <Country>England</Country>
+                <MedlineTA>Sci Data</MedlineTA>
+                <NlmUniqueID>101640192</NlmUniqueID>
+                <ISSNLinking>2052-4463</ISSNLinking>
+            </MedlineJournalInfo>
+            <CitationSubset>IM</CitationSubset>
+            <CoiStatement>DDF received salary from Enveda Biosciences.</CoiStatement>
+        </MedlineCitation>
+        <PubmedData>
+            <History>
+                <PubMedPubDate PubStatus="received">
+                    <Year>2022</Year>
+                    <Month>7</Month>
+                    <Day>16</Day>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="accepted">
+                    <Year>2022</Year>
+                    <Month>10</Month>
+                    <Day>26</Day>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="pubmed">
+                    <Year>2022</Year>
+                    <Month>11</Month>
+                    <Day>20</Day>
+                    <Hour>6</Hour>
+                    <Minute>0</Minute>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="medline">
+                    <Year>2022</Year>
+                    <Month>11</Month>
+                    <Day>23</Day>
+                    <Hour>6</Hour>
+                    <Minute>0</Minute>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="entrez">
+                    <Year>2022</Year>
+                    <Month>11</Month>
+                    <Day>19</Day>
+                    <Hour>23</Hour>
+                    <Minute>35</Minute>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="pmc-release">
+                    <Year>2022</Year>
+                    <Month>11</Month>
+                    <Day>19</Day>
+                </PubMedPubDate>
+            </History>
+            <PublicationStatus>epublish</PublicationStatus>
+            <ArticleIdList>
+                <ArticleId IdType="pubmed">36402838</ArticleId>
+                <ArticleId IdType="pmc">PMC9675740</ArticleId>
+                <ArticleId IdType="doi">10.1038/s41597-022-01807-3</ArticleId>
+                <ArticleId IdType="pii">10.1038/s41597-022-01807-3</ArticleId>
+            </ArticleIdList>
+            <ReferenceList>
+                <Reference>
+                    <Citation>Mark D, et al. The FAIR Guiding Principles for scientific data management and stewardship.
+                        Scientific Data. 2016;3(1):160018. doi: 10.1038/sdata.2016.18.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1038/sdata.2016.18</ArticleId>
+                        <ArticleId IdType="pmc">PMC4792175</ArticleId>
+                        <ArticleId IdType="pubmed">26978244</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Annika JacobsenRicardo, et al. FAIR Principles: Interpretations and Implementation
+                        Considerations. Data Intelligence. 2020;2(1-2):10&#x2013;29. doi: 10.1162/dint_r_00024.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1162/dint_r_00024</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Samantha L, et al. Sharing biological data: why when and how. FEBS Letters.
+                        2021;595(7):847&#x2013;863. doi: 10.1002/1873-3468.14067.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1002/1873-3468.14067</ArticleId>
+                        <ArticleId IdType="pmc">PMC10390076</ArticleId>
+                        <ArticleId IdType="pubmed">33843054</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Hastings, J. <i>et al</i>. ChEBI in 2016: Improved services and an expanding collection of
+                        metabolites.
+                        <i>Nucleic Acids Research</i>
+                        <b>44</b>
+                        D1214&#x2013;D1219 10.1093/nar/gkv1031 (2016).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC4702775</ArticleId>
+                        <ArticleId IdType="pubmed">26467479</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Bateman A, et al. UniProt: the universal protein knowledgebase in 2021. Nucleic Acids Res.
+                        2021;49:D480&#x2013;D489. doi: 10.1093/nar/gkaa1100.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkaa1100</ArticleId>
+                        <ArticleId IdType="pmc">PMC7778908</ArticleId>
+                        <ArticleId IdType="pubmed">33237286</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>McMurry JA, et al. Identifiers for the 21st century: How to design, provision, and reuse
+                        persistent identifiers to maximize utility and impact of life science data. PLoS Biol. 2017;15:1&#x2013;18.
+                        doi: 10.1371/journal.pbio.2001414.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1371/journal.pbio.2001414</ArticleId>
+                        <ArticleId IdType="pmc">PMC5490878</ArticleId>
+                        <ArticleId IdType="pubmed">28662064</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Kristian A, et al. A review of the new HGNC gene family resource. Human Genomics.
+                        2016;10(1):6. doi: 10.1186/s40246-016-0062-6.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1186/s40246-016-0062-6</ArticleId>
+                        <ArticleId IdType="pmc">PMC4739092</ArticleId>
+                        <ArticleId IdType="pubmed">26842383</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Bansal P, et al. Rhea, the reaction knowledgebase in 2022. Nucleic Acids Res. 2022;50:D693&#x2013;D700.
+                        doi: 10.1093/nar/gkab1016.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkab1016</ArticleId>
+                        <ArticleId IdType="pmc">PMC8728268</ArticleId>
+                        <ArticleId IdType="pubmed">34755880</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Barrett AJ. Enzyme Nomenclature. Recommendations 1992. Eur. J. Biochem. 1995;232:1. doi:
+                        10.1111/j.1432-1033.1995.tb20774.x.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1111/j.1432-1033.1995.tb20774.x</ArticleId>
+                        <ArticleId IdType="pubmed">8690012</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Fleischmann A, et al. IntEnz, the integrated relational enzyme database. Nucleic Acids
+                        Res. 2004;32:D434&#x2013;D437. doi: 10.1093/nar/gkh119.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkh119</ArticleId>
+                        <ArticleId IdType="pmc">PMC308853</ArticleId>
+                        <ArticleId IdType="pubmed">14681451</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>The Gene Ontology Consortium The Gene Ontology Resource: 20 years and still GOing strong.
+                        Nucleic Acids Res. 2019;47:D330&#x2013;D338. doi: 10.1093/nar/gky1055.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gky1055</ArticleId>
+                        <ArticleId IdType="pmc">PMC6323945</ArticleId>
+                        <ArticleId IdType="pubmed">30395331</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Hoehndorf R, Slater L, Schofield PN, Gkoutos GV. Aber-OWL: a framework for ontology-based
+                        data access in biology. BMC Bioinformatics. 2015;16:26. doi: 10.1186/s12859-015-0456-9.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1186/s12859-015-0456-9</ArticleId>
+                        <ArticleId IdType="pmc">PMC4384359</ArticleId>
+                        <ArticleId IdType="pubmed">25627673</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Jonquet C, et al. AgroPortal: A vocabulary and ontology repository for agronomy. Comput.
+                        Electron. Agric. 2018;144:126&#x2013;143. doi: 10.1016/j.compag.2017.10.012.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1016/j.compag.2017.10.012</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Mungall C, 2022. prefixcommons/biocontext: v0.1.0. Zenodo.</Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.5281/zenodo.6800248</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Unni, D. R. <i>et al</i>. Biolink Model: A universal schema for knowledge graphs in
+                        clinical, biomedical, and translational science. <i>Clin. Transl. Sci</i>. 10.1111/cts.13302
+                        (2022).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC9372416</ArticleId>
+                        <ArticleId IdType="pubmed">36125173</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Whetzel PL, et al. BioPortal: enhanced functionality via new Web services from the
+                        National Center for Biomedical Ontology to access and use ontologies in software applications.
+                        Nucleic Acids Res. 2011;39:W541&#x2013;5. doi: 10.1093/nar/gkr469.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkr469</ArticleId>
+                        <ArticleId IdType="pmc">PMC3125807</ArticleId>
+                        <ArticleId IdType="pubmed">21672956</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Bairoch A. The Cellosaurus, a Cell-Line Knowledge Resource. J. Biomol. Tech. 2018;29:25&#x2013;38.
+                        doi: 10.7171/jbt.18-2902-002.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.7171/jbt.18-2902-002</ArticleId>
+                        <ArticleId IdType="pmc">PMC5945021</ArticleId>
+                        <ArticleId IdType="pubmed">29805321</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Hastings J, et al. The chemical information ontology: Provenance and disambiguation for
+                        chemical data on the biological semantic web. PLoS One. 2011;6:1&#x2013;13. doi:
+                        10.1371/journal.pone.0025513.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1371/journal.pone.0025513</ArticleId>
+                        <ArticleId IdType="pmc">PMC3184996</ArticleId>
+                        <ArticleId IdType="pubmed">21991315</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Arnaud E, et al. The Ontologies Community of Practice: A CGIAR Initiative for Big Data in
+                        Agrifood Systems. Patterns. 2020;1:100105. doi: 10.1016/j.patter.2020.100105.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1016/j.patter.2020.100105</ArticleId>
+                        <ArticleId IdType="pmc">PMC7660444</ArticleId>
+                        <ArticleId IdType="pubmed">33205138</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Kechagioglou, X., Vaira, L., Tomassino, P., Fiore, N. &amp; Basset, A. EcoPortal: An
+                        Environment for FAIR Semantic Resources in the Ecological Domain. <i>In JOWO</i> (Bolzano,
+                        Italy, 2021).
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Ison J, et al. EDAM: an ontology of bioinformatics operations, types of data and
+                        identifiers, topics and formats. Bioinformatics. 2013;29:1325&#x2013;1332. doi:
+                        10.1093/bioinformatics/btt113.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/bioinformatics/btt113</ArticleId>
+                        <ArticleId IdType="pmc">PMC3654706</ArticleId>
+                        <ArticleId IdType="pubmed">23479348</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Sansone S-A, et al. FAIRsharing as a community approach to standards, repositories and
+                        policies. Nat. Biotechnol. 2019;37:358&#x2013;367. doi: 10.1038/s41587-019-0080-8.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1038/s41587-019-0080-8</ArticleId>
+                        <ArticleId IdType="pmc">PMC6785156</ArticleId>
+                        <ArticleId IdType="pubmed">30940948</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Bender, D. &amp; Sartipi, K. HL7 FHIR: An Agile and RESTful approach to healthcare
+                        information exchange. In <i>Proceedings of the 26th IEEE International Symposium on
+                            Computer-Based Medical Systems</i>, 326&#x2013;331, 10.1109/CBMS.2013.6627810 (2013).
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Juty N, Le Novere N, Laibe C. Identifiers.org and MIRIAM Registry: Community resources to
+                        provide persistent identification. Nucleic Acids Res. 2012;40:580&#x2013;586. doi:
+                        10.1093/nar/gkr1097.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkr1097</ArticleId>
+                        <ArticleId IdType="pmc">PMC3245029</ArticleId>
+                        <ArticleId IdType="pubmed">22140103</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Wimalaratne SM, et al. Uniform resolution of compact identifiers for biomedical data. Sci.
+                        Data. 2018;5:1&#x2013;8. doi: 10.1038/sdata.2018.29.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1038/sdata.2018.29</ArticleId>
+                        <ArticleId IdType="pmc">PMC5944906</ArticleId>
+                        <ArticleId IdType="pubmed">29737976</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Clark K, Karsch-Mizrachi I, Lipman DJ, Ostell J, Sayers EW. GenBank. Nucleic Acids Res.
+                        2016;44:D67&#x2013;72. doi: 10.1093/nar/gkv1276.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkv1276</ArticleId>
+                        <ArticleId IdType="pmc">PMC4702903</ArticleId>
+                        <ArticleId IdType="pubmed">26590407</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Jackson RC, et al. OBO Foundry in 2021: Operationalizing Open Data Principles to Evaluate
+                        Ontologies. Database (Oxford). 2021;2021:1&#x2013;9. doi: 10.1093/database/baab069.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/database/baab069</ArticleId>
+                        <ArticleId IdType="pmc">PMC8546234</ArticleId>
+                        <ArticleId IdType="pubmed">34697637</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Cote R, Jones P, Apweiler R, Hermjakob H. The Ontology Lookup Service, a lightweight
+                        cross-platform tool for controlled vocabulary queries. BMC Bioinformatics. 2006;7:1&#x2013;7.
+                        doi: 10.1186/1471-2105-7-97.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1186/1471-2105-7-97</ArticleId>
+                        <ArticleId IdType="pmc">PMC1420335</ArticleId>
+                        <ArticleId IdType="pubmed">16507094</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Ong E, et al. Ontobee: A linked ontology data server to support ontology term
+                        dereferencing, linkage, query and integration. Nucleic Acids Res. 2017;45:D347&#x2013;D352. doi:
+                        10.1093/nar/gkw918.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkw918</ArticleId>
+                        <ArticleId IdType="pmc">PMC5210626</ArticleId>
+                        <ArticleId IdType="pubmed">27733503</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>McMurry, J. &amp; Kunze, J. <i>Prefix Commons</i>.
+                        https://github.com/prefixcommons/biocontext (2017).
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Pampel H, et al. Making research data repositories visible: The re3data.org registry. PLOS
+                        ONE. 2013;8:1&#x2013;10. doi: 10.1371/journal.pone.0078080.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1371/journal.pone.0078080</ArticleId>
+                        <ArticleId IdType="pmc">PMC3817176</ArticleId>
+                        <ArticleId IdType="pubmed">24223762</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Waagmeester, A. <i>et al</i>. Wikidata as a knowledge graph for the life sciences. <i>
+                        Elife
+                    </i> 9, 10.7554/eLife.52614 (2020).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC7077981</ArticleId>
+                        <ArticleId IdType="pubmed">32180547</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Conrad, L. <i>et al</i>. NCBI Taxonomy: a comprehensive update on curation resources and
+                        tools. <i>Database</i>10.1093/database/baaa062 (2020).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC7408187</ArticleId>
+                        <ArticleId IdType="pubmed">32761142</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>van Iersel, M. P. <i>et al</i>. The BridgeDb framework: Standardized access to gene,
+                        protein and metabolite identifier mapping services. <i>BMC Bioinformatics</i> 11,
+                        10.1186/1471-2105-11-5 (2010).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC2824678</ArticleId>
+                        <ArticleId IdType="pubmed">20047655</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Callahan, T. <i>PheKnowLator</i>10.5281/zenodo.3401437 (2019).
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Himmelstein DS, et al. Open collaborative writing with Manubot. PLoS Comput. Biol.
+                        2019;15:e1007128. doi: 10.1371/journal.pcbi.1007128.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1371/journal.pcbi.1007128</ArticleId>
+                        <ArticleId IdType="pmc">PMC6611653</ArticleId>
+                        <ArticleId IdType="pubmed">31233491</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Guo T, Aebersold R. 2018. PCP39: prostate cancer proteome for 39 patients by PCT-SWATH.
+                        PRIDE Archive. PXD004589
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Matentzoglu N, et al. A Simple Standard for Sharing Ontological Mappings (SSSOM) Database.
+                        2022;2022:baac035. doi: 10.1093/database/baac035.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/database/baac035</ArticleId>
+                        <ArticleId IdType="pmc">PMC9216545</ArticleId>
+                        <ArticleId IdType="pubmed">35616100</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Gyori BM, et al. From word models to executable models of signaling networks using
+                        automated assembly. Mol. Syst. Biol. 2017;13:954. doi: 10.15252/msb.20177651.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.15252/msb.20177651</ArticleId>
+                        <ArticleId IdType="pmc">PMC5731347</ArticleId>
+                        <ArticleId IdType="pubmed">29175850</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Hoyt CT. 2022. biopragmatics/bioregistry v0.5.132. Zenodo.</Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.5281/zenodo.7216512</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Gray KA, Seal RL, Tweedie S, Wright MW, Bruford EA. A review of the new HGNC gene family
+                        resource. Hum. Genomics. 2016;10:6. doi: 10.1186/s40246-016-0062-6.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1186/s40246-016-0062-6</ArticleId>
+                        <ArticleId IdType="pmc">PMC4739092</ArticleId>
+                        <ArticleId IdType="pubmed">26842383</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Eschmeyer, W. &amp; of Sciences, C. A. <i>Catalog of Fishes. No. v. 4 in California
+                        Academy of Sciences. Center for Biodiversity Research and Information</i>. 1 (California Academy
+                        of Sciences, 1998).
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Midford, P. <i>et al</i>. The Teleost Taxonomy Ontology. <i>Nat. Preced</i>.
+                        10.1038/npre.2010.4629.1 (2010).
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Midford PE, et al. The vertebrate taxonomy ontology: a framework for reasoning across
+                        model organism and species phenotypes. J. Biomed. Semantics. 2013;4:34. doi:
+                        10.1186/2041-1480-4-34.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1186/2041-1480-4-34</ArticleId>
+                        <ArticleId IdType="pmc">PMC4177199</ArticleId>
+                        <ArticleId IdType="pubmed">24267744</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Dexter PrattJing, et al. NDEx the Network Data Exchange. Cell Systems. 2015;1(4):302&#x2013;305.
+                        doi: 10.1016/j.cels.2015.10.001.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1016/j.cels.2015.10.001</ArticleId>
+                        <ArticleId IdType="pmc">PMC4649937</ArticleId>
+                        <ArticleId IdType="pubmed">26594663</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Rando, H. M. <i>et al</i>. An open-publishing response to the COVID-19 infodemic. In
+                        Balke, W. <i>et al</i>. (eds.) <i>Proceedings of the Workshop on Digital Infrastructures for
+                            Scholarly Content Objects (DISCO 2021) co-located with ACM/IEEE Joint Conference on Digital
+                            Libraries 2021(JCDL 2021), Online (Due to the Global Pandemic), September 30, 2021, vol.
+                            2976 of CEUR Workshop Proceedings</i>, 29&#x2013;38 (CEUR-WS.org, 2021).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC9093051</ArticleId>
+                        <ArticleId IdType="pubmed">35558551</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Kishore R, et al. Automated generation of gene summaries at the Alliance of Genome
+                        Resources. Database. 2020;2020:baaa037. doi: 10.1093/database/baaa037.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/database/baaa037</ArticleId>
+                        <ArticleId IdType="pmc">PMC7304461</ArticleId>
+                        <ArticleId IdType="pubmed">32559296</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Gyori, B. M., Hoyt, C. T. &amp; Steppi, A. Gilda: biomedical entity text normalization
+                        with machine-learned disambiguation as a service. <i>Bioinformatics Advances</i> 2,
+                        10.1093/bioadv/vbac034 (2022).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC9710686</ArticleId>
+                        <ArticleId IdType="pubmed">36699362</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Willighagen E. Bacting: a next generation, command line version of Bioclipse. Statement of
+                        Need. Journal of Open Source Software. 2021;6:1&#x2013;5. doi: 10.21105/joss.02558.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.21105/joss.02558</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Doherty LM, et al. Integrating multi-omics data reveals function and therapeutic potential
+                        of deubiquitinating enzymes. eLife. 2022;11:e72879. doi: 10.7554/eLife.72879.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.7554/eLife.72879</ArticleId>
+                        <ArticleId IdType="pmc">PMC9225015</ArticleId>
+                        <ArticleId IdType="pubmed">35737447</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Bachman JA, Gyori BM, Sorger PK. FamPlex: A resource for entity recognition and
+                        relationship resolution of human protein families and complexes in biomedical text mining. BMC
+                        Bioinformatics. 2018;19:1&#x2013;14. doi: 10.1186/s12859-018-2211-5.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1186/s12859-018-2211-5</ArticleId>
+                        <ArticleId IdType="pmc">PMC6022344</ArticleId>
+                        <ArticleId IdType="pubmed">29954318</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Mulder NJ, et al. InterPro, progress and status in 2005. Nucleic Acids Research.
+                        2005;33:D201&#x2013;D205. doi: 10.1093/nar/gki106.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gki106</ArticleId>
+                        <ArticleId IdType="pmc">PMC540060</ArticleId>
+                        <ArticleId IdType="pubmed">15608177</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Rogers FB. Medical subject headings. Bull. Med. Libr. Assoc. 1963;51:114&#x2013;6.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pmc">PMC197951</ArticleId>
+                        <ArticleId IdType="pubmed">13982385</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Meldal BH, et al. The complex portal - An encyclopaedia of macromolecular complexes.
+                        Nucleic Acids Res. 2015;43:D479&#x2013;D484. doi: 10.1093/nar/gku975.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gku975</ArticleId>
+                        <ArticleId IdType="pmc">PMC4384031</ArticleId>
+                        <ArticleId IdType="pubmed">25313161</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Zahn-Zabal M, et al. The neXtProt knowledgebase in 2020: data, tools and usability
+                        improvements. Nucleic Acids Research. 2019;48:D328&#x2013;D334. doi: 10.1093/nar/gkz995.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkz995</ArticleId>
+                        <ArticleId IdType="pmc">PMC7145669</ArticleId>
+                        <ArticleId IdType="pubmed">31724716</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Sung M, et al. BERN2: an advanced neural biomedical named entity recognition and
+                        normalization tool. Bioinformatics. 2022;38:4837&#x2013;4839. doi:
+                        10.1093/bioinformatics/btac598.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/bioinformatics/btac598</ArticleId>
+                        <ArticleId IdType="pmc">PMC9563680</ArticleId>
+                        <ArticleId IdType="pubmed">36053172</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Malik-Sheriff RS, et al. BioModels &#x2014; 15 years of sharing computational models in
+                        life science. Nucleic Acids Research. 2020;48:D407&#x2013;D415. doi: 10.1093/nar/gkz1055.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.1093/nar/gkz1055</ArticleId>
+                        <ArticleId IdType="pmc">PMC7145643</ArticleId>
+                        <ArticleId IdType="pubmed">31701150</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Bonner, S. <i>et al</i>. A review of biomedical datasets relating to drug discovery: a
+                        knowledge graph perspective. <i>Briefings in Bioinformatics</i>10.1093/bib/bbac404 (2022).
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="pubmed">36151740</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Tiwari K, et al. Reproducibility in systems biology modelling. Mol. Syst. Biol.
+                        2021;17:e9982. doi: 10.15252/msb.20209982.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.15252/msb.20209982</ArticleId>
+                        <ArticleId IdType="pmc">PMC7901289</ArticleId>
+                        <ArticleId IdType="pubmed">33620773</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+                <Reference>
+                    <Citation>Wong JV, et al. Science Forum: Author-sourced capture of pathway knowledge in computable
+                        form using Biofactoid. Elife. 2021;10:e68292. doi: 10.7554/eLife.68292.
+                    </Citation>
+                    <ArticleIdList>
+                        <ArticleId IdType="doi">10.7554/eLife.68292</ArticleId>
+                        <ArticleId IdType="pmc">PMC8683078</ArticleId>
+                        <ArticleId IdType="pubmed">34860157</ArticleId>
+                    </ArticleIdList>
+                </Reference>
+            </ReferenceList>
+        </PubmedData>
+    </PubmedArticle>
+</PubmedArticleSet>

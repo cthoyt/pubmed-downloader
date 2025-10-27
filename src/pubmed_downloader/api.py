@@ -8,9 +8,10 @@ import gzip
 import itertools as itt
 import json
 import logging
+import typing
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypeAlias
 from xml.etree.ElementTree import Element
 
 import click
@@ -21,6 +22,7 @@ from curies import Reference, Triple
 from curies import vocabulary as v
 from curies.triples import read_triples, write_triples
 from lxml import etree
+from more_click import verbose_option
 from pydantic import BaseModel, Field
 from pystow.utils import safe_open_writer
 from tqdm import tqdm
@@ -74,6 +76,14 @@ def _download_updates(url: str) -> Path:
     return UPDATES_MODULE.ensure(url=url)
 
 
+class JournalIssue(BaseModel):
+    """Represents the issue of a journal in which the article was published."""
+
+    volume: str | None = None
+    issue: str | None = None
+    published: datetime.date | None = None
+
+
 class Journal(BaseModel):
     """Represents a reference to a journal.
 
@@ -95,6 +105,34 @@ class AbstractText(BaseModel):
     category: str | None = None
 
 
+class History(BaseModel):
+    """Represents a history item."""
+
+    status: Literal[
+        "received",
+        "accepted",
+        "pubmed",
+        "medline",
+        "entrez",
+        "pmc-release",
+        "revised",
+        "aheadofprint",
+        "retracted",
+        "ecollection",
+    ]
+    date: datetime.date
+
+
+class Grant(BaseModel):
+    """Represents a grant item."""
+
+    id: str | None = None
+    acronym: str | None = None
+    agency: str  # use ROR to ground agency
+    agency_reference: str | None = None
+    country: str  # TODO use pydantic validation
+
+
 #: aslo see edam:has_topic
 HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
 #: also see biolink:published_in, EFO:0001796
@@ -114,10 +152,18 @@ class Article(BaseModel):
     )
     headings: list[Heading] = Field(default_factory=list)
     journal: Journal
+    journal_issue: JournalIssue
     abstract: list[AbstractText] = Field(default_factory=list)
-    authors: list[Author | Collective]
+    authors: list[Author | Collective] = Field(default_factory=list)
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
+    history: list[History] = Field(default_factory=list)
+    grants: list[Grant] = Field(default_factory=list)
+
+    @property
+    def date_published(self) -> datetime.date | None:
+        """Get the date published from the journal issue."""
+        return self.journal_issue.published
 
     def get_abstract(self) -> str:
         """Get the full abstract."""
@@ -166,7 +212,7 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(
-    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    path: Path, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -183,34 +229,37 @@ def _parse_from_path(
 
 
 def _extract_article(  # noqa:C901
-    element: Element, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    element: Element, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
-        raise ValueError
+        raise ValueError("article is missing MedlineCitation tag")
     pmid_tag = medline_citation.find("PMID")
     if pmid_tag is None:
-        raise ValueError
+        raise ValueError("article is missing PMID tag")
 
     if not pmid_tag.text:
-        raise ValueError
+        raise ValueError("article has an empty PMID tag")
     pubmed = int(pmid_tag.text)
 
     article = medline_citation.find("Article")
     if article is None:
-        raise ValueError
+        raise ValueError(f"[pubmed:{pubmed}] is missing an Article tag")
     title_tag = article.find("ArticleTitle")
     if title_tag is None:
-        raise ValueError
+        raise ValueError(f"[pubmed:{pubmed}] is missing an ArticleTitle tag")
     title = title_tag.text
     if title is None:
+        logger.debug(
+            "[pubmed:%s] has an empty ArticleTitle tag:%s",
+            pubmed,
+            etree.tostring(element, pretty_print=True, encoding="unicode"),
+        )
         return None
-
-    article.find("Abstract")
 
     pubmed_data = element.find("PubmedData")
     if pubmed_data is None:
-        raise ValueError
+        raise ValueError(f"[pubmed:{pubmed}] is missing a PubmedData tag")
 
     date_completed = parse_date(medline_citation.find("DateCompleted"))
     date_revised = parse_date(medline_citation.find("DateRevised"))
@@ -232,6 +281,7 @@ def _extract_article(  # noqa:C901
 
     medline_journal = medline_citation.find("MedlineJournalInfo")
     if medline_journal is None:
+        logger.debug("[pubmed:%s] missing MedlineJournalInfo section", pubmed)
         return None
 
     issn_linking = medline_journal.findtext("ISSNLinking")
@@ -260,6 +310,11 @@ def _extract_article(  # noqa:C901
         if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
     ]
 
+    grants = [
+        _parse_grant(grant, ror_grounder=ror_grounder)
+        for grant in medline_citation.findall("..//GrantList/Grant")
+    ]
+
     cites_pubmed_ids = [
         cites_pubmed_id
         for citation_reference_tag in medline_citation.findall(".//ReferenceList/Reference")
@@ -273,6 +328,14 @@ def _extract_article(  # noqa:C901
         if article_id_tag.text and (prefix := article_id_tag.attrib["IdType"]) not in SKIP_PREFIXES
     ]
 
+    history = [
+        history
+        for pubmed_date in pubmed_data.findall(".//History/PubMedPubDate")
+        if (history := _parse_pub_date(pubmed_date))
+    ]
+
+    journal_issue = _get_journal_issue(article)
+
     return Article(
         pubmed=pubmed,
         title=title,
@@ -285,7 +348,45 @@ def _extract_article(  # noqa:C901
         authors=authors,
         xrefs=xrefs,
         cites_pubmed_ids=cites_pubmed_ids,
+        history=history,
+        journal_issue=journal_issue,
+        grants=grants,
     )
+
+
+def _get_journal_issue(article: Element) -> JournalIssue:
+    volume = None
+    issue = None
+    publication_date = None
+    if (journal_element := article.find("Journal")) is not None:
+        if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
+            volume = journal_issue_element.findtext("Volume")
+            # TODO create data model for issue? e.g., "1-2"
+            issue = journal_issue_element.findtext("Issue")
+            if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
+                publication_date = parse_date(pubdate_element)
+    return JournalIssue(
+        volume=volume,
+        issue=issue,
+        published=publication_date,
+    )
+
+
+def _parse_pub_date(element: Element) -> History | None:
+    status = element.attrib.get("PubStatus")
+    if status is None:
+        tqdm.write(f"missing status: {etree.tostring(element)}")
+        return None
+    date = parse_date(element)
+    if date is None:
+        return None
+    try:
+        rv = History(status=status, date=date)
+    except ValueError:
+        tqdm.write(f"invalid status: {status}")
+        return None
+    else:
+        return rv
 
 
 SKIP_PREFIXES = {"pubmed"}
@@ -298,24 +399,53 @@ def _parse_reference(reference_tag: Element) -> str | None:
     return None
 
 
-def ensure_baselines() -> list[Path]:
-    """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_baselines())
+def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
+    grant_id = element.findtext("GrantID")
+    acronym = element.findtext("Acronym")
+    agency = element.findtext("Agency")
 
-
-def iterate_ensure_baselines() -> Iterable[Path]:
-    """Ensure all the baseline files are downloaded."""
-    yield from thread_map(
-        _download_baseline,
-        _get_urls(BASELINE_URL),
-        desc="Downloading PubMed baseline",
-        leave=False,
+    if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
+        agency_reference = match.reference
+    else:
+        agency_reference = None
+    country = element.findtext("Country")
+    return Grant(
+        id=grant_id,
+        acronym=acronym,
+        agency=agency,
+        agency_reference=agency_reference,
+        country=country,
     )
 
 
-def process_baselines(*, force_process: bool = False) -> list[Article]:
+Source: TypeAlias = Literal["remote", "local"]
+
+
+def ensure_baselines(*, source: Source | None = None) -> list[Path]:
+    """Ensure all the baseline files are downloaded."""
+    return list(iterate_ensure_baselines(source=source))
+
+
+def iterate_ensure_baselines(*, source: Source | None = None) -> Iterable[Path]:
+    """Ensure all the baseline files are downloaded."""
+    if source == "remote" or source is None:
+        yield from thread_map(
+            _download_baseline,
+            _get_urls(BASELINE_URL),
+            desc="Downloading PubMed baseline",
+            leave=False,
+        )
+    elif source == "local":
+        yield from BASELINE_MODULE.base.glob("*.xml.gz")
+    else:
+        raise ValueError
+
+
+def process_baselines(
+    *, force_process: bool = False, source: Source | None = None
+) -> list[Article]:
     """Ensure and process all baseline files."""
-    return list(iterate_process_baselines(force_process=force_process))
+    return list(iterate_process_baselines(force_process=force_process, source=source))
 
 
 def iterate_process_baselines(
@@ -324,15 +454,18 @@ def iterate_process_baselines(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
-    paths = ensure_baselines()
+    paths = ensure_baselines(source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
+        ground=ground,
         unit="baseline",
     )
 
@@ -345,8 +478,12 @@ def _shared_process(
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
+    ground: bool = True,
 ) -> Iterable[Article]:
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    if ground:
+        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    else:
+        ror_grounder, mesh_grounder = None, None
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -370,19 +507,27 @@ def _shared_process(
     return itt.chain.from_iterable(xxx)
 
 
-def ensure_updates() -> list[Path]:
+def ensure_updates(
+    *,
+    source: Source | None = None,
+) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_updates())
+    return list(iterate_ensure_updates(source=source))
 
 
-def iterate_ensure_updates() -> Iterable[Path]:
+def iterate_ensure_updates(*, source: Source | None = None) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
-    yield from thread_map(
-        _download_updates,
-        _get_urls(UPDATES_URL),
-        desc="Downloading PubMed updates",
-        leave=False,
-    )
+    if source is None or source == "remote":
+        yield from thread_map(
+            _download_updates,
+            _get_urls(UPDATES_URL),
+            desc="Downloading PubMed updates",
+            leave=False,
+        )
+    elif source == "local":
+        yield from UPDATES_MODULE.base.glob("*.xml.gz")
+    else:
+        raise ValueError(f"invalid source: {source}")
 
 
 def process_updates(*, force_process: bool = False) -> list[Article]:
@@ -413,26 +558,30 @@ def iterate_process_updates(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
-    paths = ensure_updates()
-
+    paths = ensure_updates(source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
+        ground=ground,
         unit="updates",
     )
 
 
 def process_articles(
-    *, force_process: bool = False, multiprocessing: bool = False
+    *, force_process: bool = False, multiprocessing: bool = False, source: Source | None = None
 ) -> list[Article]:
     """Ensure and process articles from baseline, then updates."""
     return list(
-        iterate_process_articles(force_process=force_process, multiprocessing=multiprocessing)
+        iterate_process_articles(
+            force_process=force_process, multiprocessing=multiprocessing, source=source
+        )
     )
 
 
@@ -442,34 +591,43 @@ def iterate_process_articles(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
+    source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    if ground:
+        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    else:
+        ror_grounder, mesh_grounder = None, None
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         multiprocessing=multiprocessing,
+        source=source,
+        ground=ground,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         multiprocessing=multiprocessing,
+        source=source,
+        ground=ground,
     )
 
 
-def iterate_ensure_articles() -> Iterable[Path]:
+def iterate_ensure_articles(*, source: Source | None = None) -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_updates()
-    yield from iterate_ensure_baselines()
+    yield from iterate_ensure_updates(source=source)
+    yield from iterate_ensure_baselines(source=source)
 
 
 def _process_xml_gz(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -486,8 +644,8 @@ def _process_xml_gz(
 def _iterate_process_xml_gz(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -511,18 +669,18 @@ def _iterate_process_xml_gz(
         yield from models
 
 
-def get_edges(*, force_process: bool = False) -> list[Triple]:
+def get_edges(*, force_process: bool = False, **kwargs: Any) -> list[Triple]:
     """Get edges from PubMed."""
     if EDGES_PATH.is_file() and not force_process:
         return read_triples(EDGES_PATH)
-    rv = list(iterate_edges(force_process=force_process))
+    rv = list(iterate_edges(force_process=force_process, **kwargs))
     write_triples(rv, EDGES_PATH)
     return rv
 
 
-def iterate_edges(*, force_process: bool = False) -> Iterable[Triple]:
+def iterate_edges(**kwargs: Any) -> Iterable[Triple]:
     """Iterate over edges from PubMed."""
-    for article in iterate_process_articles(force_process=force_process):
+    for article in iterate_process_articles(**kwargs):
         yield from article._triples()
 
 
@@ -538,9 +696,14 @@ def save_sssom(**kwargs: Any) -> None:
 @click.command(name="articles")
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
-def _main(force_process: bool, multiprocessing: bool) -> None:
+@verbose_option
+@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
+def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> None:
     """Download and process articles."""
-    save_sssom(force_process=force_process, multiprocessing=multiprocessing)
+    for _ in iterate_process_articles(
+        force_process=force_process, multiprocessing=multiprocessing, source=source
+    ):
+        pass
 
 
 if __name__ == "__main__":
