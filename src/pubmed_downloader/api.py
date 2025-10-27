@@ -8,9 +8,11 @@ import gzip
 import itertools as itt
 import json
 import logging
+import typing
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 from xml.etree.ElementTree import Element
 
 import click
@@ -21,6 +23,7 @@ from curies import Reference, Triple
 from curies import vocabulary as v
 from curies.triples import read_triples, write_triples
 from lxml import etree
+from more_click import verbose_option
 from pydantic import BaseModel, Field
 from pystow.utils import safe_open_writer
 from tqdm import tqdm
@@ -124,8 +127,8 @@ class History(BaseModel):
 class Grant(BaseModel):
     """Represents a grant item."""
 
-    id: str
-    acronym: str
+    id: str | None
+    acronym: str | None
     agency: str  # use ROR to ground agency
     agency_reference: str | None = None
     country: str  # TODO use pydantic validation
@@ -392,10 +395,17 @@ def _parse_reference(reference_tag: Element) -> str | None:
     return None
 
 
+GRANT_COUNTER = Counter()
+
+
 def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
     grant_id = element.findtext("GrantID")
     acronym = element.findtext("Acronym")
     agency = element.findtext("Agency")
+
+    for k in element:
+        GRANT_COUNTER[k.tag] += 1
+
     if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
         agency_reference = match.reference
     else:
@@ -410,24 +420,34 @@ def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Gr
     )
 
 
-def ensure_baselines() -> list[Path]:
+Source: TypeAlias = Literal["remote", "local"]
+
+
+def ensure_baselines(*, source: Source | None = None) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_baselines())
+    return list(iterate_ensure_baselines(source=source))
 
 
-def iterate_ensure_baselines() -> Iterable[Path]:
+def iterate_ensure_baselines(*, source: Source | None = None) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
-    yield from thread_map(
-        _download_baseline,
-        _get_urls(BASELINE_URL),
-        desc="Downloading PubMed baseline",
-        leave=False,
-    )
+    if source == "remote" or source is None:
+        yield from thread_map(
+            _download_baseline,
+            _get_urls(BASELINE_URL),
+            desc="Downloading PubMed baseline",
+            leave=False,
+        )
+    elif source == "local":
+        yield from BASELINE_MODULE.base.glob("*.xml.gz")
+    else:
+        raise ValueError
 
 
-def process_baselines(*, force_process: bool = False) -> list[Article]:
+def process_baselines(
+    *, force_process: bool = False, source: Source | None = None
+) -> list[Article]:
     """Ensure and process all baseline files."""
-    return list(iterate_process_baselines(force_process=force_process))
+    return list(iterate_process_baselines(force_process=force_process, source=source))
 
 
 def iterate_process_baselines(
@@ -436,9 +456,10 @@ def iterate_process_baselines(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    source: Source | None = None,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
-    paths = ensure_baselines()
+    paths = ensure_baselines(source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
@@ -482,19 +503,27 @@ def _shared_process(
     return itt.chain.from_iterable(xxx)
 
 
-def ensure_updates() -> list[Path]:
+def ensure_updates(
+    *,
+    source: Source | None = None,
+) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_updates())
+    return list(iterate_ensure_updates(source=source))
 
 
-def iterate_ensure_updates() -> Iterable[Path]:
+def iterate_ensure_updates(*, source: Source | None = None) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
-    yield from thread_map(
-        _download_updates,
-        _get_urls(UPDATES_URL),
-        desc="Downloading PubMed updates",
-        leave=False,
-    )
+    if source is None or source == "remote":
+        yield from thread_map(
+            _download_updates,
+            _get_urls(UPDATES_URL),
+            desc="Downloading PubMed updates",
+            leave=False,
+        )
+    elif source == "local":
+        yield from UPDATES_MODULE.base.glob("*.xml.gz")
+    else:
+        raise ValueError(f"invalid source: {source}")
 
 
 def process_updates(*, force_process: bool = False) -> list[Article]:
@@ -506,6 +535,8 @@ def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
 ) -> tuple[ssslm.Grounder, ssslm.Grounder]:
+    return None, None
+
     if ror_grounder is None:
         import pyobo
 
@@ -525,10 +556,10 @@ def iterate_process_updates(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    source: Source | None = None,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
-    paths = ensure_updates()
-
+    paths = ensure_updates(source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
@@ -540,11 +571,13 @@ def iterate_process_updates(
 
 
 def process_articles(
-    *, force_process: bool = False, multiprocessing: bool = False
+    *, force_process: bool = False, multiprocessing: bool = False, source: Source | None = None
 ) -> list[Article]:
     """Ensure and process articles from baseline, then updates."""
     return list(
-        iterate_process_articles(force_process=force_process, multiprocessing=multiprocessing)
+        iterate_process_articles(
+            force_process=force_process, multiprocessing=multiprocessing, source=source
+        )
     )
 
 
@@ -554,6 +587,7 @@ def iterate_process_articles(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
+    source: Source | None = None,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
     ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
@@ -562,12 +596,14 @@ def iterate_process_articles(
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         multiprocessing=multiprocessing,
+        source=source,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         multiprocessing=multiprocessing,
+        source=source,
     )
 
 
@@ -623,18 +659,18 @@ def _iterate_process_xml_gz(
         yield from models
 
 
-def get_edges(*, force_process: bool = False) -> list[Triple]:
+def get_edges(*, force_process: bool = False, **kwargs: Any) -> list[Triple]:
     """Get edges from PubMed."""
     if EDGES_PATH.is_file() and not force_process:
         return read_triples(EDGES_PATH)
-    rv = list(iterate_edges(force_process=force_process))
+    rv = list(iterate_edges(force_process=force_process, **kwargs))
     write_triples(rv, EDGES_PATH)
     return rv
 
 
-def iterate_edges(*, force_process: bool = False) -> Iterable[Triple]:
+def iterate_edges(**kwargs: Any) -> Iterable[Triple]:
     """Iterate over edges from PubMed."""
-    for article in iterate_process_articles(force_process=force_process):
+    for article in iterate_process_articles(**kwargs):
         yield from article._triples()
 
 
@@ -650,9 +686,18 @@ def save_sssom(**kwargs: Any) -> None:
 @click.command(name="articles")
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
-def _main(force_process: bool, multiprocessing: bool) -> None:
+@verbose_option
+@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
+def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> None:
     """Download and process articles."""
-    save_sssom(force_process=force_process, multiprocessing=multiprocessing)
+    for _ in iterate_process_articles(
+        force_process=force_process, multiprocessing=multiprocessing, source=source
+    ):
+        pass
+
+    from tabulate import tabulate
+
+    click.echo(tabulate(GRANT_COUNTER.most_common()))
 
 
 if __name__ == "__main__":
