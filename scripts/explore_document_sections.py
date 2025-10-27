@@ -24,6 +24,7 @@ XX = {
         "ASTRACT",
         "ABSTRACT",
         "Abstract",
+        "summary",
     },
     "background": {
         "Background",
@@ -42,14 +43,23 @@ XX = {
         "Motivation",
         "BACKGROUND/OBJECTIVES",
         "BACKGROUND/OBJECTIVE",
+        "background/purpose",
+        "background context",
     },
     "objective": {
         "Objective",
         "OBJECTIVE",
         "OBJECTIVES",
         "study objectives",
+        "study objective",
         "rationaleandobjective",
         "purpose",
+        "aim",
+        "purpose of review",
+        "aims and objectives",
+        "aims/hypothesis",
+        "objectives/hypothesis",
+        "statement of problem",
     },
     "introduction": {
         "Introduction",
@@ -57,6 +67,7 @@ XX = {
         "BACKGROUND/INTRODUCTION",
         "INTRODUCTION/OBJECTIVES",
         "INTRODUCTION AND OBJECTIVES",
+        "introduction and hypothesis",
     },
     "materials and methods": {
         "METHOD",
@@ -83,6 +94,7 @@ XX = {
         "MATERIALS",
         "MATERLALS AND METHODS",
         "DESIGN/METHODOLOGY/APPROACH",
+        "methods/design",
     },
     "methods and results": {
         "METHODS AND RESULTS",
@@ -90,6 +102,7 @@ XX = {
         "APPROACH AND RESULTS",
         "methods and results",
         "METHODS AND FINDINGS",
+        "methodology/principal findings",
     },
     "results": {
         "RESULT",
@@ -116,6 +129,7 @@ XX = {
         "DISCUSSION",
         "Discussion",
         "Interpretation",
+        "implications",
     },
     "discussion and conclusion": {
         "DISCUSSION & CONCLUSION",
@@ -147,11 +161,19 @@ XX = {
         "Conclusions and Relevance",
         "CONCLUSIONS AND RELEVANCE",
         "conclusion and significance",
+        "conclusion(s)",
+        "conclusions and clinical relevance",
+        "conclusions/interpretation",
+        #
+        "reviewer's conclusions",
     },
     "funding": {
         "FUNDING",
         "Funding",
         "FUNDINGS",
+    },
+    None: {
+        "unlabelled",
     },
 }
 RELABELING = {_normalize(value): k for k, values in XX.items() for value in values}
