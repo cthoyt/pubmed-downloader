@@ -9,7 +9,6 @@ import itertools as itt
 import json
 import logging
 import typing
-from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Literal, TypeAlias
@@ -127,8 +126,8 @@ class History(BaseModel):
 class Grant(BaseModel):
     """Represents a grant item."""
 
-    id: str | None
-    acronym: str | None
+    id: str | None = None
+    acronym: str | None = None
     agency: str  # use ROR to ground agency
     agency_reference: str | None = None
     country: str  # TODO use pydantic validation
@@ -395,16 +394,10 @@ def _parse_reference(reference_tag: Element) -> str | None:
     return None
 
 
-GRANT_COUNTER = Counter()
-
-
 def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
     grant_id = element.findtext("GrantID")
     acronym = element.findtext("Acronym")
     agency = element.findtext("Agency")
-
-    for k in element:
-        GRANT_COUNTER[k.tag] += 1
 
     if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
         agency_reference = match.reference
@@ -535,8 +528,6 @@ def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
 ) -> tuple[ssslm.Grounder, ssslm.Grounder]:
-    return None, None
-
     if ror_grounder is None:
         import pyobo
 
@@ -607,10 +598,10 @@ def iterate_process_articles(
     )
 
 
-def iterate_ensure_articles() -> Iterable[Path]:
+def iterate_ensure_articles(*, source: Source | None = None) -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_updates()
-    yield from iterate_ensure_baselines()
+    yield from iterate_ensure_updates(source=source)
+    yield from iterate_ensure_baselines(source=source)
 
 
 def _process_xml_gz(
@@ -694,10 +685,6 @@ def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> 
         force_process=force_process, multiprocessing=multiprocessing, source=source
     ):
         pass
-
-    from tabulate import tabulate
-
-    click.echo(tabulate(GRANT_COUNTER.most_common()))
 
 
 if __name__ == "__main__":
