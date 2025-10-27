@@ -23,7 +23,18 @@ from .catalog import (
     ensure_journal_overview,
     ensure_serfile_catalog,
     process_catalog,
+    process_catalog_provider_links,
     process_journal_overview,
+)
+from .client import (
+    count_search_results,
+    get_abstracts,
+    get_abstracts_dict,
+    get_articles,
+    get_articles_dict,
+    get_titles,
+    get_titles_dict,
+    search,
 )
 from .utils import ISSN, Author, Heading, Qualifier
 
@@ -36,12 +47,19 @@ __all__ = [
     "Heading",
     "Journal",
     "Qualifier",
+    "count_search_results",
     "ensure_baselines",
     "ensure_catalog_provider_links",
     "ensure_catfile_catalog",
     "ensure_journal_overview",
     "ensure_serfile_catalog",
     "ensure_updates",
+    "get_abstracts",
+    "get_abstracts_dict",
+    "get_articles",
+    "get_articles_dict",
+    "get_titles",
+    "get_titles_dict",
     "iterate_ensure_articles",
     "iterate_ensure_baselines",
     "iterate_ensure_updates",
@@ -54,4 +72,5 @@ __all__ = [
     "process_catalog_provider_links",
     "process_journal_overview",
     "process_updates",
+    "search",
 ]
