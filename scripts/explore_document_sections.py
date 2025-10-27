@@ -162,10 +162,12 @@ def main() -> None:
     label_counter: Counter[tuple[str, bool]] = Counter()
     category_counter: Counter[str] = Counter()
 
-    n = 10_000
-    for article, _ in zip(
-        iterate_process_articles(source="local", ground=False), range(n), strict=False
-    ):
+    n = None
+    it = iterate_process_articles(source="local", ground=False)
+    if n is not None:
+        it = (article for article, _ in zip(it, range(n), strict=False))
+
+    for article in it:
         for t in article.abstract:
             if t.label:
                 label = _normalize(t.label)
