@@ -207,7 +207,7 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(
-    path: Path, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    path: Path, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -450,6 +450,7 @@ def iterate_process_baselines(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines(source=source)
@@ -459,6 +460,7 @@ def iterate_process_baselines(
         mesh_grounder=mesh_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
+        ground=ground,
         unit="baseline",
     )
 
@@ -471,8 +473,12 @@ def _shared_process(
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
+    ground: bool = True,
 ) -> Iterable[Article]:
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    if ground:
+        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    else:
+        ror_grounder, mesh_grounder = None, None
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -548,6 +554,7 @@ def iterate_process_updates(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
     source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates(source=source)
@@ -557,6 +564,7 @@ def iterate_process_updates(
         mesh_grounder=mesh_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
+        ground=ground,
         unit="updates",
     )
 
@@ -579,15 +587,20 @@ def iterate_process_articles(
     mesh_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
     source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    if ground:
+        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+    else:
+        ror_grounder, mesh_grounder = None, None
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
         multiprocessing=multiprocessing,
         source=source,
+        ground=ground,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
@@ -595,6 +608,7 @@ def iterate_process_articles(
         mesh_grounder=mesh_grounder,
         multiprocessing=multiprocessing,
         source=source,
+        ground=ground,
     )
 
 
@@ -607,8 +621,8 @@ def iterate_ensure_articles(*, source: Source | None = None) -> Iterable[Path]:
 def _process_xml_gz(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -625,8 +639,8 @@ def _process_xml_gz(
 def _iterate_process_xml_gz(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
