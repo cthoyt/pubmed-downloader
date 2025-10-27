@@ -1,4 +1,4 @@
-"""Calculate stas."""
+"""Calculate statistics over the sections appearing in article abstracts."""
 
 import textwrap
 from collections import Counter
@@ -19,7 +19,7 @@ def _normalize(s: str) -> str:
     return s
 
 
-XX = {
+CATEGORY_TO_LABELS = {
     "abstract": {
         "ASTRACT",
         "ABSTRACT",
@@ -176,7 +176,7 @@ XX = {
         "unlabelled",
     },
 }
-RELABELING = {_normalize(value): k for k, values in XX.items() for value in values}
+RELABELING = {_normalize(value): k for k, values in CATEGORY_TO_LABELS.items() for value in values}
 
 
 def main() -> None:
