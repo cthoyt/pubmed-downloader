@@ -265,7 +265,9 @@ def _extract_article(  # noqa:C901
     date_revised = parse_date(medline_citation.find("DateRevised"))
 
     types = sorted(
-        x.attrib["UI"] for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
+        x.attrib["UI"]
+        for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
+        if x.attrib["UI"]
     )
 
     headings = [
