@@ -517,7 +517,7 @@ def _shared_process(
             ror_grounder, mesh_grounder, author_grounder
         )
     else:
-        ror_grounder, mesh_grounder = None, None
+        ror_grounder, mesh_grounder, author_grounder = None, None, None
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -775,9 +775,8 @@ def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> Non
 @click.command(name="articles")
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
-@click.option("--test", is_flag=True, help="Run a test file")
-@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
 @verbose_option
+@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
 def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> None:
     """Download and process articles."""
     for _ in iterate_process_articles(
