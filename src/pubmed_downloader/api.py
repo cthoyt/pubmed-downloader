@@ -11,7 +11,7 @@ import logging
 import typing
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TextIO, TypeAlias
 from xml.etree.ElementTree import Element
 
 import click
@@ -66,6 +66,9 @@ BASELINE_MODULE = MODULE.module("baseline")
 UPDATES_MODULE = MODULE.module("updates")
 EDGES_PATH = MODULE.join(name="edges.tsv.gz")
 SSSOM_PATH = MODULE.join(name="articles.sssom.tsv.gz")
+TEST_PATH = MODULE.join(name="articles-test.sssom.tsv")
+UPDATES_PATH = MODULE.join(name="updates.html")
+BASELINE_PATH = MODULE.join(name="baseline.html")
 
 
 def _download_baseline(url: str) -> Path:
@@ -197,10 +200,16 @@ class Article(BaseModel):
         return "D016441" in self.type_mesh_ids
 
 
-def _get_urls(url: str) -> list[str]:
-    res = requests.get(url, timeout=300)
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, "html.parser")
+def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
+    if cache_path.is_file() and not force:
+        text = cache_path.read_text()
+    else:
+        res = requests.get(url, timeout=300)
+        res.raise_for_status()
+        text = res.text
+        cache_path.write_text(text)
+
+    soup = BeautifulSoup(text, "html.parser")
     return sorted(
         (
             url + href  # type:ignore
@@ -212,7 +221,11 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(
-    path: Path, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -222,14 +235,21 @@ def _parse_from_path(
 
     for pubmed_article in tree.findall("PubmedArticle"):
         article = _extract_article(
-            pubmed_article, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+            pubmed_article,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
         )
         if article:
             yield article
 
 
 def _extract_article(  # noqa:C901
-    element: Element, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    element: Element,
+    *,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
@@ -309,7 +329,11 @@ def _extract_article(  # noqa:C901
     authors = [
         author
         for i, author_tag in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
-        if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
+        if (
+            author := parse_author(
+                i, author_tag, ror_grounder=ror_grounder, author_grounder=author_grounder
+            )
+        )
     ]
 
     grants = [
@@ -420,20 +444,19 @@ def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Gr
     )
 
 
-Source: TypeAlias = Literal["remote", "local"]
-
-
-def ensure_baselines(*, source: Source | None = None) -> list[Path]:
+def ensure_baselines(*, force: bool, source: Source | None = None) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_baselines(source=source))
+    return list(iterate_ensure_baselines(force=force, source=source))
 
 
-def iterate_ensure_baselines(*, source: Source | None = None) -> Iterable[Path]:
+def iterate_ensure_baselines(
+    *, source: Source | None = None, force: bool = False
+) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
     if source == "remote" or source is None:
         yield from thread_map(
             _download_baseline,
-            _get_urls(BASELINE_URL),
+            _ensure_urls(BASELINE_URL, BASELINE_PATH, force=force),
             desc="Downloading PubMed baseline",
             leave=False,
         )
@@ -441,6 +464,9 @@ def iterate_ensure_baselines(*, source: Source | None = None) -> Iterable[Path]:
         yield from BASELINE_MODULE.base.glob("*.xml.gz")
     else:
         raise ValueError
+
+
+Source: TypeAlias = Literal["remote", "local"]
 
 
 def process_baselines(
@@ -456,15 +482,18 @@ def iterate_process_baselines(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
+    force_listing: bool = False,
     source: Source | None = None,
     ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
-    paths = ensure_baselines(source=source)
+    paths = ensure_baselines(force=force_listing, source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
         ground=ground,
@@ -477,15 +506,18 @@ def _shared_process(
     *,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
     ground: bool = True,
 ) -> Iterable[Article]:
     if ground:
-        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+        ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+            ror_grounder, mesh_grounder, author_grounder
+        )
     else:
-        ror_grounder, mesh_grounder = None, None
+        ror_grounder, mesh_grounder, author_grounder = None, None, None
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -494,6 +526,7 @@ def _shared_process(
             _process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
         xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
@@ -502,6 +535,7 @@ def _shared_process(
             _iterate_process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
         xxx = map(func, tqdm(paths, **tqdm_kwargs))
@@ -511,18 +545,20 @@ def _shared_process(
 
 def ensure_updates(
     *,
+    force: bool,
     source: Source | None = None,
 ) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_updates(source=source))
+    return list(iterate_ensure_updates(force=force, source=source))
 
 
-def iterate_ensure_updates(*, source: Source | None = None) -> Iterable[Path]:
+def iterate_ensure_updates(*, force: bool = False, source: Source | None = None) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
     if source is None or source == "remote":
+        urls = _ensure_urls(UPDATES_URL, UPDATES_PATH, force=force)
         yield from thread_map(
             _download_updates,
-            _get_urls(UPDATES_URL),
+            urls,
             desc="Downloading PubMed updates",
             leave=False,
         )
@@ -540,18 +576,30 @@ def process_updates(*, force_process: bool = False) -> list[Article]:
 def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
-) -> tuple[ssslm.Grounder, ssslm.Grounder]:
+    author_grounder: ssslm.Grounder | None = None,
+) -> tuple[ssslm.Grounder, ssslm.Grounder, ssslm.Grounder]:
     if ror_grounder is None:
         import pyobo
 
+        logger.info("getting ROR grounder")
         ror_grounder = pyobo.get_grounder("ror")
+        logger.info("done getting ROR grounder")
 
     if mesh_grounder is None:
         import pyobo
 
+        logger.info("getting MeSH grounder")
         mesh_grounder = pyobo.get_grounder("mesh")
+        logger.info("done getting MeSH grounder")
 
-    return ror_grounder, mesh_grounder
+    if author_grounder is None:
+        from orcid_downloader.lexical import get_orcid_grounder
+
+        logger.info("getting ORCiD grounder")
+        author_grounder = get_orcid_grounder()
+        logger.info("done getting ORCiD grounder")
+
+    return ror_grounder, mesh_grounder, author_grounder
 
 
 def iterate_process_updates(
@@ -560,29 +608,39 @@ def iterate_process_updates(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
+    force_listing: bool = False,
     source: Source | None = None,
     ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
-    paths = ensure_updates(source=source)
+    paths = ensure_updates(force=force_listing, source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
         ground=ground,
-        unit="updates",
+        unit="update",
     )
 
 
 def process_articles(
-    *, force_process: bool = False, multiprocessing: bool = False, source: Source | None = None
+    *,
+    force_process: bool = False,
+    multiprocessing: bool = False,
+    force_listing: bool = False,
+    source: Source | None = None,
 ) -> list[Article]:
     """Ensure and process articles from baseline, then updates."""
     return list(
         iterate_process_articles(
-            force_process=force_process, multiprocessing=multiprocessing, source=source
+            force_process=force_process,
+            multiprocessing=multiprocessing,
+            force_listing=force_listing,
+            source=source,
         )
     )
 
@@ -592,20 +650,27 @@ def iterate_process_articles(
     force_process: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
+    force_listing: bool = False,
     source: Source | None = None,
     ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
+    """Ensure and process articles from baseline, then updates."""
     if ground:
-        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+        ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+            ror_grounder, mesh_grounder, author_grounder
+        )
     else:
-        ror_grounder, mesh_grounder = None, None
+        ror_grounder, mesh_grounder, author_grounder = None, None, None
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
+        force_listing=force_listing,
         source=source,
         ground=ground,
     )
@@ -613,16 +678,18 @@ def iterate_process_articles(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
+        force_listing=force_listing,
         source=source,
         ground=ground,
     )
 
 
-def iterate_ensure_articles(*, source: Source | None = None) -> Iterable[Path]:
+def iterate_ensure_articles(*, force: bool = False, source: Source | None = None) -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_updates(source=source)
-    yield from iterate_ensure_baselines(source=source)
+    yield from iterate_ensure_updates(force=force, source=source)
+    yield from iterate_ensure_baselines(force=force, source=source)
 
 
 def _process_xml_gz(
@@ -630,6 +697,7 @@ def _process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder | None,
     mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -638,6 +706,7 @@ def _process_xml_gz(
             path=path,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
     )
@@ -648,6 +717,7 @@ def _iterate_process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder | None,
     mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -661,7 +731,12 @@ def _iterate_process_xml_gz(
     else:
         with logging_redirect_tqdm():
             models = list(
-                _parse_from_path(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
+                _parse_from_path(
+                    path,
+                    ror_grounder=ror_grounder,
+                    mesh_grounder=mesh_grounder,
+                    author_grounder=author_grounder,
+                )
             )
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
@@ -686,9 +761,11 @@ def iterate_edges(**kwargs: Any) -> Iterable[Triple]:
         yield from article._triples()
 
 
-def save_sssom(**kwargs: Any) -> None:
+def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> None:
     """Save an SSSOM file for articles."""
-    with safe_open_writer(SSSOM_PATH) as writer:
+    if path is None:
+        path = SSSOM_PATH
+    with safe_open_writer(path) as writer:
         for article in iterate_process_articles(**kwargs):
             p = f"pubmed:{article.pubmed}"
             for xref in article.xrefs:

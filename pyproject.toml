@@ -65,6 +65,7 @@ dependencies = [
     "typing-extensions",
     "more-itertools",
     "ratelimit",
+    "more-click",
 ]
 
 # see https://peps.python.org/pep-0735/ and https://docs.astral.sh/uv/concepts/dependencies/#dependency-groups
@@ -124,6 +125,7 @@ release = [
 [project.optional-dependencies]
 process = [
     "pyobo",
+    "orcid-downloader",
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
