@@ -8,9 +8,10 @@ import gzip
 import itertools as itt
 import json
 import logging
+import typing
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal, TextIO
+from typing import Any, Literal, TextIO, TypeAlias
 from xml.etree.ElementTree import Element
 
 import click
@@ -125,6 +126,16 @@ class History(BaseModel):
     date: datetime.date
 
 
+class Grant(BaseModel):
+    """Represents a grant item."""
+
+    id: str | None = None
+    acronym: str | None = None
+    agency: str  # use ROR to ground agency
+    agency_reference: str | None = None
+    country: str  # TODO use pydantic validation
+
+
 #: aslo see edam:has_topic
 HAS_TOPIC = Reference(prefix="biolink", identifier="has_topic")
 #: also see biolink:published_in, EFO:0001796
@@ -150,6 +161,7 @@ class Article(BaseModel):
     cites_pubmed_ids: list[str] = Field(default_factory=list)
     xrefs: list[Reference] = Field(default_factory=list)
     history: list[History] = Field(default_factory=list)
+    grants: list[Grant] = Field(default_factory=list)
 
     @property
     def date_published(self) -> datetime.date | None:
@@ -182,6 +194,11 @@ class Article(BaseModel):
         for xref in self.xrefs:
             yield v.exact_match, xref
 
+    def is_retracted(self) -> bool:
+        """Check if the article is retracted."""
+        # see https://www.ncbi.nlm.nih.gov/mesh/68016441
+        return "D016441" in self.type_mesh_ids
+
 
 def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
     if cache_path.is_file() and not force:
@@ -206,9 +223,9 @@ def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
 def _parse_from_path(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -268,7 +285,9 @@ def _extract_article(  # noqa:C901
     date_revised = parse_date(medline_citation.find("DateRevised"))
 
     types = sorted(
-        x.attrib["UI"] for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
+        x.attrib["UI"]
+        for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
+        if x.attrib["UI"]
     )
 
     headings = [
@@ -317,6 +336,11 @@ def _extract_article(  # noqa:C901
         )
     ]
 
+    grants = [
+        _parse_grant(grant, ror_grounder=ror_grounder)
+        for grant in medline_citation.findall("..//GrantList/Grant")
+    ]
+
     cites_pubmed_ids = [
         cites_pubmed_id
         for citation_reference_tag in medline_citation.findall(".//ReferenceList/Reference")
@@ -352,6 +376,7 @@ def _extract_article(  # noqa:C901
         cites_pubmed_ids=cites_pubmed_ids,
         history=history,
         journal_issue=journal_issue,
+        grants=grants,
     )
 
 
@@ -400,25 +425,55 @@ def _parse_reference(reference_tag: Element) -> str | None:
     return None
 
 
-def ensure_baselines(*, force: bool) -> list[Path]:
+def ensure_baselines(*, force: bool, source: Source | None = None) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_baselines(force=force))
+    return list(iterate_ensure_baselines(force=force, source=source))
 
 
-def iterate_ensure_baselines(*, force: bool) -> Iterable[Path]:
+def iterate_ensure_baselines(
+    *, source: Source | None = None, force: bool = False
+) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
-    urls = _ensure_urls(BASELINE_URL, BASELINE_PATH, force=force)
-    yield from thread_map(
-        _download_baseline,
-        urls,
-        desc="Downloading PubMed baseline",
-        leave=False,
+    if source == "remote" or source is None:
+        yield from thread_map(
+            _download_baseline,
+            _ensure_urls(BASELINE_URL, BASELINE_PATH, force=force),
+            desc="Downloading PubMed baseline",
+            leave=False,
+        )
+    elif source == "local":
+        yield from BASELINE_MODULE.base.glob("*.xml.gz")
+    else:
+        raise ValueError
+
+
+def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
+    grant_id = element.findtext("GrantID")
+    acronym = element.findtext("Acronym")
+    agency = element.findtext("Agency")
+
+    if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
+        agency_reference = match.reference
+    else:
+        agency_reference = None
+    country = element.findtext("Country")
+    return Grant(
+        id=grant_id,
+        acronym=acronym,
+        agency=agency,
+        agency_reference=agency_reference,
+        country=country,
     )
 
 
-def process_baselines(*, force_process: bool = False) -> list[Article]:
+Source: TypeAlias = Literal["remote", "local"]
+
+
+def process_baselines(
+    *, force_process: bool = False, source: Source | None = None
+) -> list[Article]:
     """Ensure and process all baseline files."""
-    return list(iterate_process_baselines(force_process=force_process))
+    return list(iterate_process_baselines(force_process=force_process, source=source))
 
 
 def iterate_process_baselines(
@@ -429,9 +484,11 @@ def iterate_process_baselines(
     mesh_grounder: ssslm.Grounder | None = None,
     author_grounder: ssslm.Grounder | None = None,
     force_listing: bool = False,
+    source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
-    paths = ensure_baselines(force=force_listing)
+    paths = ensure_baselines(force=force_listing, source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
@@ -439,6 +496,7 @@ def iterate_process_baselines(
         author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
+        ground=ground,
         unit="baseline",
     )
 
@@ -452,10 +510,14 @@ def _shared_process(
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
+    ground: bool = True,
 ) -> Iterable[Article]:
-    ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
-        ror_grounder, mesh_grounder, author_grounder
-    )
+    if ground:
+        ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+            ror_grounder, mesh_grounder, author_grounder
+        )
+    else:
+        ror_grounder, mesh_grounder = None, None
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
@@ -481,20 +543,29 @@ def _shared_process(
     return itt.chain.from_iterable(xxx)
 
 
-def ensure_updates(*, force: bool) -> list[Path]:
+def ensure_updates(
+    *,
+    force: bool,
+    source: Source | None = None,
+) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_updates(force=force))
+    return list(iterate_ensure_updates(force=force, source=source))
 
 
-def iterate_ensure_updates(*, force: bool = False) -> Iterable[Path]:
+def iterate_ensure_updates(*, force: bool = False, source: Source | None = None) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
-    urls = _ensure_urls(UPDATES_URL, UPDATES_PATH, force=force)
-    yield from thread_map(
-        _download_updates,
-        urls,
-        desc="Downloading PubMed updates",
-        leave=False,
-    )
+    if source is None or source == "remote":
+        urls = _ensure_urls(UPDATES_URL, UPDATES_PATH, force=force)
+        yield from thread_map(
+            _download_updates,
+            urls,
+            desc="Downloading PubMed updates",
+            leave=False,
+        )
+    elif source == "local":
+        yield from UPDATES_MODULE.base.glob("*.xml.gz")
+    else:
+        raise ValueError(f"invalid source: {source}")
 
 
 def process_updates(*, force_process: bool = False) -> list[Article]:
@@ -539,10 +610,11 @@ def iterate_process_updates(
     mesh_grounder: ssslm.Grounder | None = None,
     author_grounder: ssslm.Grounder | None = None,
     force_listing: bool = False,
+    source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
-    paths = ensure_updates(force=force_listing)
-
+    paths = ensure_updates(force=force_listing, source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
@@ -550,6 +622,7 @@ def iterate_process_updates(
         author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
+        ground=ground,
         unit="update",
     )
 
@@ -559,6 +632,7 @@ def process_articles(
     force_process: bool = False,
     multiprocessing: bool = False,
     force_listing: bool = False,
+    source: Source | None = None,
 ) -> list[Article]:
     """Ensure and process articles from baseline, then updates."""
     return list(
@@ -566,6 +640,7 @@ def process_articles(
             force_process=force_process,
             multiprocessing=multiprocessing,
             force_listing=force_listing,
+            source=source,
         )
     )
 
@@ -578,13 +653,17 @@ def iterate_process_articles(
     author_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
     force_listing: bool = False,
+    source: Source | None = None,
+    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
-    (
-        ror_grounder,
-        mesh_grounder,
-        author_grounder,
-    ) = _ensure_grounders(ror_grounder, mesh_grounder, author_grounder)
+    """Ensure and process articles from baseline, then updates."""
+    if ground:
+        ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+            ror_grounder, mesh_grounder, author_grounder
+        )
+    else:
+        ror_grounder, mesh_grounder, author_grounder = None, None, None
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
@@ -592,6 +671,8 @@ def iterate_process_articles(
         author_grounder=author_grounder,
         multiprocessing=multiprocessing,
         force_listing=force_listing,
+        source=source,
+        ground=ground,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
@@ -600,21 +681,23 @@ def iterate_process_articles(
         author_grounder=author_grounder,
         multiprocessing=multiprocessing,
         force_listing=force_listing,
+        source=source,
+        ground=ground,
     )
 
 
-def iterate_ensure_articles(*, force: bool = False) -> Iterable[Path]:
+def iterate_ensure_articles(*, force: bool = False, source: Source | None = None) -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_updates(force=force)
-    yield from iterate_ensure_baselines(force=force)
+    yield from iterate_ensure_updates(force=force, source=source)
+    yield from iterate_ensure_baselines(force=force, source=source)
 
 
 def _process_xml_gz(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -632,9 +715,9 @@ def _process_xml_gz(
 def _iterate_process_xml_gz(
     path: Path,
     *,
-    ror_grounder: ssslm.Grounder,
-    mesh_grounder: ssslm.Grounder,
-    author_grounder: ssslm.Grounder,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
@@ -693,14 +776,14 @@ def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> Non
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("-m", "--multiprocessing", is_flag=True)
 @click.option("--test", is_flag=True, help="Run a test file")
-@verbose_option  # type:ignore[misc]
-def _main(force_process: bool, multiprocessing: bool, test: bool) -> None:
+@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
+@verbose_option
+def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> None:
     """Download and process articles."""
-    save_sssom(
-        force_process=force_process,
-        multiprocessing=multiprocessing,
-        path=TEST_PATH if test else None,
-    )
+    for _ in iterate_process_articles(
+        force_process=force_process, multiprocessing=multiprocessing, source=source
+    ):
+        pass
 
 
 if __name__ == "__main__":
