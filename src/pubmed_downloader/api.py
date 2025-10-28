@@ -425,6 +425,25 @@ def _parse_reference(reference_tag: Element) -> str | None:
     return None
 
 
+def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
+    grant_id = element.findtext("GrantID")
+    acronym = element.findtext("Acronym")
+    agency = element.findtext("Agency")
+
+    if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
+        agency_reference = match.reference
+    else:
+        agency_reference = None
+    country = element.findtext("Country")
+    return Grant(
+        id=grant_id,
+        acronym=acronym,
+        agency=agency,
+        agency_reference=agency_reference,
+        country=country,
+    )
+
+
 def ensure_baselines(*, force: bool, source: Source | None = None) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
     return list(iterate_ensure_baselines(force=force, source=source))
@@ -445,25 +464,6 @@ def iterate_ensure_baselines(
         yield from BASELINE_MODULE.base.glob("*.xml.gz")
     else:
         raise ValueError
-
-
-def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Grant:
-    grant_id = element.findtext("GrantID")
-    acronym = element.findtext("Acronym")
-    agency = element.findtext("Agency")
-
-    if agency and ror_grounder is not None and (match := ror_grounder.get_best_match(agency)):
-        agency_reference = match.reference
-    else:
-        agency_reference = None
-    country = element.findtext("Country")
-    return Grant(
-        id=grant_id,
-        acronym=acronym,
-        agency=agency,
-        agency_reference=agency_reference,
-        country=country,
-    )
 
 
 Source: TypeAlias = Literal["remote", "local"]
