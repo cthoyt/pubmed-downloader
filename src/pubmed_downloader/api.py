@@ -191,6 +191,11 @@ class Article(BaseModel):
         for xref in self.xrefs:
             yield v.exact_match, xref
 
+    def is_retracted(self) -> bool:
+        """Check if the article is retracted."""
+        # see https://www.ncbi.nlm.nih.gov/mesh/68016441
+        return "D016441" in self.type_mesh_ids
+
 
 def _get_urls(url: str) -> list[str]:
     res = requests.get(url, timeout=300)
@@ -260,7 +265,9 @@ def _extract_article(  # noqa:C901
     date_revised = parse_date(medline_citation.find("DateRevised"))
 
     types = sorted(
-        x.attrib["UI"] for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
+        x.attrib["UI"]
+        for x in medline_citation.findall(".//PublicationTypeList/PublicationType")
+        if x.attrib["UI"]
     )
 
     headings = [
