@@ -8,6 +8,7 @@ import gzip
 import itertools as itt
 import logging
 import multiprocessing as mp
+import os
 import typing
 from collections.abc import Iterable
 from pathlib import Path
@@ -533,7 +534,7 @@ def _shared_process(
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
-        n_workers = 5
+        n_workers = os.cpu_count() - 2
         mp.set_start_method("spawn", force=True)
         lock = mp.RLock()
         tqdm.set_lock(lock)
