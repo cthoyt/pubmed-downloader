@@ -6,8 +6,8 @@ import datetime
 import functools
 import gzip
 import itertools as itt
-import json
 import logging
+import multiprocessing as mp
 import typing
 from collections.abc import Iterable
 from pathlib import Path
@@ -26,6 +26,7 @@ from more_click import verbose_option
 from pydantic import BaseModel, Field
 from pystow.utils import safe_open_writer
 from tqdm import tqdm
+from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
@@ -35,7 +36,6 @@ from .utils import (
     Author,
     Collective,
     Heading,
-    _json_default,
     parse_author,
     parse_date,
     parse_mesh_heading,
@@ -226,6 +226,7 @@ def _parse_from_path(
     ror_grounder: ssslm.Grounder | None,
     mesh_grounder: ssslm.Grounder | None,
     author_grounder: ssslm.Grounder | None,
+    position: int | None = None,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -233,7 +234,14 @@ def _parse_from_path(
         tqdm.write(f"failed to parse {path}")
         return
 
-    for pubmed_article in tree.findall("PubmedArticle"):
+    for pubmed_article in tqdm(
+        tree.findall("PubmedArticle"),
+        unit="article",
+        unit_scale=True,
+        leave=False,
+        desc=f"parsing {path.name}",
+        position=position,
+    ):
         article = _extract_article(
             pubmed_article,
             ror_grounder=ror_grounder,
@@ -525,6 +533,10 @@ def _shared_process(
 
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
+        n_workers = 5
+        mp.set_start_method("spawn", force=True)
+        lock = mp.RLock()
+        tqdm.set_lock(lock)
         # multiprocessing can't return generators, needs to consumed into lists
         func = functools.partial(
             _process_xml_gz,
@@ -532,8 +544,9 @@ def _shared_process(
             mesh_grounder=mesh_grounder,
             author_grounder=author_grounder,
             force_process=force_process,
+            n_workers=n_workers,
         )
-        xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
+        xxx = process_map(func, paths, **tqdm_kwargs, chunksize=1, max_workers=n_workers)
     else:
         func = functools.partial(
             _iterate_process_xml_gz,
@@ -542,7 +555,7 @@ def _shared_process(
             author_grounder=author_grounder,
             force_process=force_process,
         )
-        xxx = map(func, tqdm(paths, **tqdm_kwargs))
+        xxx = tmap(func, paths, **tqdm_kwargs)
 
     return itt.chain.from_iterable(xxx)
 
@@ -703,6 +716,7 @@ def _process_xml_gz(
     mesh_grounder: ssslm.Grounder | None,
     author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
+    n_workers: int | None = None,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
     return list(
@@ -712,6 +726,7 @@ def _process_xml_gz(
             mesh_grounder=mesh_grounder,
             author_grounder=author_grounder,
             force_process=force_process,
+            n_workers=n_workers,
         )
     )
 
@@ -723,31 +738,40 @@ def _iterate_process_xml_gz(
     mesh_grounder: ssslm.Grounder | None,
     author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
+    n_workers: int | None = None,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
+    if n_workers:
+        # Worker identity is 1-based
+        worker_id = mp.current_process()._identity[0] - 1
+        # add one back in since there's an outer progress bar that should always
+        # be in the first position
+        position = 1 + worker_id % n_workers
+    else:
+        position = None
+
     new_name = path.stem.removesuffix(".xml")
-    new_path = path.with_stem(new_name).with_suffix(".json.gz")
+    new_path = path.with_stem(new_name).with_suffix(".jsonl.gz")
     if new_path.is_file() and not force_process:
         with gzip.open(new_path, mode="rt") as file:
-            for part in json.load(file):
-                yield Article.model_validate(part)
+            for line in file:
+                yield Article.model_validate_json(line)
 
     else:
-        with logging_redirect_tqdm():
-            models = list(
-                _parse_from_path(
-                    path,
-                    ror_grounder=ror_grounder,
-                    mesh_grounder=mesh_grounder,
-                    author_grounder=author_grounder,
+        with logging_redirect_tqdm(), gzip.open(new_path, mode="wt") as file:
+            for model in _parse_from_path(
+                path,
+                ror_grounder=ror_grounder,
+                mesh_grounder=mesh_grounder,
+                author_grounder=author_grounder,
+                position=position,
+            ):
+                file.write(
+                    model.model_dump_json(
+                        exclude_none=True, exclude_defaults=True, ensure_ascii=False
+                    )
                 )
-            )
-
-        processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
-        with gzip.open(new_path, mode="wt") as file:
-            json.dump(processed, file, default=_json_default, ensure_ascii=False)
-
-        yield from models
+                yield model
 
 
 def get_edges(*, force_process: bool = False, **kwargs: Any) -> list[Triple]:
