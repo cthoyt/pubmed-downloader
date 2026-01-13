@@ -18,7 +18,7 @@ import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import Reference, Triple
+from curies import NamableReference, Reference, Triple
 from curies import vocabulary as v
 from curies.triples import read_triples, write_triples
 from lxml import etree
@@ -129,7 +129,7 @@ class Grant(BaseModel):
     id: str | None = None
     acronym: str | None = None
     agency: str  # use ROR to ground agency
-    agency_reference: str | None = None
+    agency_reference: NamableReference | None = None
     country: str  # TODO use pydantic validation
 
 
