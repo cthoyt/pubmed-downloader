@@ -745,7 +745,7 @@ def _iterate_process_xml_gz(
 
         processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
         with gzip.open(new_path, mode="wt") as file:
-            json.dump(processed, file, default=_json_default)
+            json.dump(processed, file, default=_json_default, ensure_ascii=False)
 
         yield from models
 
