@@ -1,9 +1,3 @@
-<!--
-<p align="center">
-  <img src="https://github.com/cthoyt/pubmed-downloader/raw/main/docs/source/logo.png" height="150">
-</p>
--->
-
 <h1 align="center">
   PubMed Downloader
 </h1>
