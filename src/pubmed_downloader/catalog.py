@@ -653,7 +653,11 @@ def _parse_catalog(
     if cache_path.is_file() and not force_process and False:
         yield from _read_catalog(cache_path)
     else:
-        tree = etree.parse(path)
+        try:
+            tree = etree.parse(path)
+        except SyntaxError:
+            tqdm.write(f"{path} failed to parse, skipping")
+            return
         catalog_records = []
         for tag in tree.findall("NLMCatalogRecord"):
             catalog_record = _extract_catalog_record(
