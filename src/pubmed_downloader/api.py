@@ -309,7 +309,14 @@ def _extract_article(  # noqa:C901
     authors = [
         author
         for i, author_tag in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
-        if (author := parse_author(i, author_tag, ror_grounder=ror_grounder))
+        if (
+            author := parse_author(
+                i,
+                author_tag,
+                ror_grounder=ror_grounder,
+                doc_key=pubmed,
+            )
+        )
     ]
 
     grants = [
