@@ -18,7 +18,7 @@ import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import Reference, Triple
+from curies import NamableReference, Reference, Triple
 from curies import vocabulary as v
 from curies.triples import read_triples, write_triples
 from lxml import etree
@@ -132,7 +132,7 @@ class Grant(BaseModel):
     id: str | None = None
     acronym: str | None = None
     agency: str  # use ROR to ground agency
-    agency_reference: str | None = None
+    agency_reference: NamableReference | None = None
     country: str  # TODO use pydantic validation
 
 
@@ -331,7 +331,11 @@ def _extract_article(  # noqa:C901
         for i, author_tag in enumerate(medline_citation.findall(".//AuthorList/Author"), start=1)
         if (
             author := parse_author(
-                i, author_tag, ror_grounder=ror_grounder, author_grounder=author_grounder
+                i,
+                author_tag,
+                ror_grounder=ror_grounder,
+                doc_key=pubmed,
+                author_grounder=author_grounder,
             )
         )
     ]
