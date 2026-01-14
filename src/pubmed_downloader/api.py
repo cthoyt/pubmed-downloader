@@ -498,7 +498,6 @@ def iterate_process_baselines(
     author_grounder: ssslm.Grounder | None = None,
     force_listing: bool = False,
     source: Source | None = None,
-    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
     paths = ensure_baselines(force=force_listing, source=source)
@@ -509,7 +508,6 @@ def iterate_process_baselines(
         author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
-        ground=ground,
         unit="baseline",
     )
 
@@ -523,18 +521,10 @@ def _shared_process(
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
-    ground: bool = True,
 ) -> Iterable[Article]:
-    if ground:
-        ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
-            ror_grounder, mesh_grounder, author_grounder
-        )
-    else:
-        ror_grounder, mesh_grounder, author_grounder = None, None, None
-
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
-        n_workers = os.cpu_count() - 2
+        n_workers = (os.cpu_count() or 5) - 2
         mp.set_start_method("spawn", force=True)
         lock = mp.RLock()
         tqdm.set_lock(lock)
@@ -629,7 +619,6 @@ def iterate_process_updates(
     author_grounder: ssslm.Grounder | None = None,
     force_listing: bool = False,
     source: Source | None = None,
-    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
     paths = ensure_updates(force=force_listing, source=source)
@@ -640,7 +629,6 @@ def iterate_process_updates(
         author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
-        ground=ground,
         unit="update",
     )
 
@@ -690,7 +678,6 @@ def iterate_process_articles(
         multiprocessing=multiprocessing,
         force_listing=force_listing,
         source=source,
-        ground=ground,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
@@ -700,7 +687,6 @@ def iterate_process_articles(
         multiprocessing=multiprocessing,
         force_listing=force_listing,
         source=source,
-        ground=ground,
     )
 
 
@@ -806,10 +792,11 @@ def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> Non
 @click.option("-m", "--multiprocessing", is_flag=True)
 @verbose_option
 @click.option("--source", type=click.Choice(list(typing.get_args(Source))))
-def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> None:
+@click.option("--ground/--no-ground", is_flag=True)
+def _main(force_process: bool, multiprocessing: bool, source: Source | None, ground: bool) -> None:
     """Download and process articles."""
     for _ in iterate_process_articles(
-        force_process=force_process, multiprocessing=multiprocessing, source=source
+        force_process=force_process, multiprocessing=multiprocessing, source=source, ground=ground
     ):
         pass
 

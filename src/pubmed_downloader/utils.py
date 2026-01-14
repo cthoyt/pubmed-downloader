@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import re
+from calendar import monthrange
 from collections.abc import Iterable
 from typing import Any, Literal
 from xml.etree.ElementTree import Element
@@ -56,20 +57,33 @@ def parse_date(date_tag: Element | None) -> datetime.date | None:
     if year_tag is None or not year_tag.text:
         return None
     year = int(year_tag.text)
-    month_tag = date_tag.find("Month")
-    if month_tag is not None and (month_text := month_tag.text):
-        month = _handle_month(month_text)
-    else:
-        month = None
-    day_tag = date_tag.find("Day")
-    day = int(day_tag.text) if day_tag is not None and day_tag.text else None
+    month = _get_month(date_tag)
+    day = _get_day(date_tag, year, month)
     try:
-        rv = datetime.date(year=year, month=month or 1, day=day or 1)
+        rv = datetime.date(year=year, month=month, day=day)
     except ValueError:
         tqdm.write(f"failed to parse {year=} {month=} {day=}")
         return None
     else:
         return rv
+
+
+def _get_month(date_tag: Element) -> int:
+    month_tag = date_tag.find("Month")
+    if month_tag is None or not month_tag.text:
+        return 1  # default
+    return _handle_month(month_tag.text) or 1
+
+
+def _get_day(date_tag: Element, year: int, month: int) -> int:
+    day_tag = date_tag.find("Day")
+    if day_tag is None or not day_tag.text:
+        return 1
+    day = int(day_tag.text)
+    _start, n_days = monthrange(year, month)
+    if day > n_days:  # sometimes there are issues where date is out of range
+        day = n_days
+    return day
 
 
 def _handle_month(month_text: str) -> int | None:
