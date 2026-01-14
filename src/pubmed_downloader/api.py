@@ -9,8 +9,10 @@ import itertools as itt
 import logging
 import multiprocessing as mp
 import os
+import sys
 import typing
 from collections.abc import Iterable
+from itertools import chain
 from pathlib import Path
 from typing import Any, Literal, TextIO, TypeAlias
 from xml.etree.ElementTree import Element
@@ -788,13 +790,55 @@ def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> Non
 
 
 @click.command(name="articles")
-@click.option("-f", "--force-process", is_flag=True)
-@click.option("-m", "--multiprocessing", is_flag=True)
+@click.option(
+    "-f",
+    "--force-process",
+    is_flag=True,
+    help="If given, re-processes the articles. Does not re-download.",
+)
+@click.option("-m", "--multiprocessing", is_flag=True, help="Should multiprocessing get used?")
 @verbose_option
-@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
-@click.option("--ground/--no-ground", is_flag=True)
-def _main(force_process: bool, multiprocessing: bool, source: Source | None, ground: bool) -> None:
+@click.option(
+    "--source",
+    type=click.Choice(list(typing.get_args(Source))),
+    default="remote",
+    help="Choose where the index of files comes from. Remote means that the NCBI FTP server is "
+    "queried, which is flaky. Local means a previous cache of the index is used.",
+)
+@click.option(
+    "--ground/--no-ground",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Should MeSH terms, organizations, and authors get grounded?",
+)
+@click.option(
+    "--clear",
+    is_flag=True,
+    help="Delete cached JSON/JSONL files for articles, then exit without doing any processing. "
+    "Useful for cleaning up and iteratively developing the processor.",
+)
+def _main(
+    force_process: bool, multiprocessing: bool, source: Source | None, ground: bool, clear: bool
+) -> None:
     """Download and process articles."""
+    if clear:
+        click.secho("deleting cached JSON/JSONL files", fg="yellow")
+        click.confirm("Are you sure you want to delete the cached JSON/JSONL files?", abort=True)
+        for path in tqdm(
+            list(
+                chain(
+                    BASELINE_MODULE.base.glob("*.json.gz"),
+                    BASELINE_MODULE.base.glob("*.jsonl.gz"),
+                    UPDATES_MODULE.base.glob("*.json.gz"),
+                    UPDATES_MODULE.base.glob("*.jsonl.gz"),
+                )
+            )
+        ):
+            tqdm.write(f"deleting {path}")
+            path.unlink()
+        sys.exit(0)
+
     for _ in iterate_process_articles(
         force_process=force_process, multiprocessing=multiprocessing, source=source, ground=ground
     ):
