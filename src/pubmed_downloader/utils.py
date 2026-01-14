@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import logging
 import re
+from calendar import monthrange
 from collections.abc import Iterable
 from typing import Any, Literal
 from xml.etree.ElementTree import Element
@@ -42,7 +43,7 @@ ORCID_PREFIXES = [
 
 
 class ISSN(BaseModel):
-    """Represents an ISSN number, annotated with its type."""
+    """Represents an ISSN, annotated with its type."""
 
     value: str
     type: Literal["Print", "Electronic", "Undetermined", "Linking"]
@@ -56,20 +57,33 @@ def parse_date(date_tag: Element | None) -> datetime.date | None:
     if year_tag is None or not year_tag.text:
         return None
     year = int(year_tag.text)
-    month_tag = date_tag.find("Month")
-    if month_tag is not None and (month_text := month_tag.text):
-        month = _handle_month(month_text)
-    else:
-        month = None
-    day_tag = date_tag.find("Day")
-    day = int(day_tag.text) if day_tag is not None and day_tag.text else None
+    month = _get_month(date_tag)
+    day = _get_day(date_tag, year, month)
     try:
-        rv = datetime.date(year=year, month=month or 1, day=day or 1)
+        rv = datetime.date(year=year, month=month, day=day)
     except ValueError:
         tqdm.write(f"failed to parse {year=} {month=} {day=}")
         return None
     else:
         return rv
+
+
+def _get_month(date_tag: Element) -> int:
+    month_tag = date_tag.find("Month")
+    if month_tag is None or not month_tag.text:
+        return 1  # default
+    return _handle_month(month_tag.text) or 1
+
+
+def _get_day(date_tag: Element, year: int, month: int) -> int:
+    day_tag = date_tag.find("Day")
+    if day_tag is None or not day_tag.text:
+        return 1
+    day = int(day_tag.text)
+    _start, n_days = monthrange(year, month)
+    if day > n_days:  # sometimes there are issues where date is out of range
+        day = n_days
+    return day
 
 
 def _handle_month(month_text: str) -> int | None:
@@ -98,12 +112,19 @@ MONTHS: dict[str, int] = {
 }
 
 
+class Organization(BaseModel):
+    """Represents an organization."""
+
+    name: str
+    reference: NamableReference | None = None
+
+
 class Author(BaseModel):
     """Represents an author."""
 
     position: int
     valid: bool = True
-    affiliations: list[str] = Field(default_factory=list)
+    affiliations: list[Organization] = Field(default_factory=list)
     # must have at least one of name/orcid
     name: str | None = None
     orcid: str | None = None
@@ -128,11 +149,38 @@ STARTS = (
 )
 
 
+def parse_affiliations(tag: Element, ror_grounder: ssslm.Grounder | None) -> list[Organization]:
+    """Parse affiliations from an XML element."""
+    organizations = []
+    for affiliation in tag.findall(".//AffiliationInfo/Affiliation"):
+        if not affiliation.text:
+            continue
+        if ror_grounder is None:
+            reference = None
+        elif match := ror_grounder.get_best_match(affiliation.text):
+            reference = match.reference
+        elif annotations_ := ror_grounder.annotate(affiliation.text):
+            reference = annotations_[0].reference
+        else:
+            reference = None
+        organization = Organization(
+            name=affiliation.text,
+            reference=reference,
+        )
+        organizations.append(organization)
+    return organizations
+
+
 def parse_author(  # noqa:C901
-    position: int, tag: Element, *, doc_key: int | None = None, ror_grounder: ssslm.Grounder | None
+    position: int,
+    tag: Element,
+    *,
+    doc_key: int | None = None,
+    ror_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Author | Collective | None:
     """Parse an author XML object."""
-    affiliations = [a.text for a in tag.findall(".//AffiliationInfo/Affiliation") if a.text]
+    affiliations = parse_affiliations(tag, ror_grounder=ror_grounder)
     valid = _parse_yn(tag.attrib["ValidYN"]) if "ValidYN" in tag.attrib else True
 
     orcid = None
@@ -204,6 +252,13 @@ def parse_author(  # noqa:C901
             f"Other tags to check: {remainder}"
         )
         return None
+
+    if (
+        orcid is None
+        and author_grounder
+        and (best_orcid_match := author_grounder.get_best_match(name))
+    ):
+        orcid = best_orcid_match.identifier
 
     return Author(
         position=position,

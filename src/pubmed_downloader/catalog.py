@@ -386,7 +386,11 @@ def _extract_rels(tag: Element) -> list[TitleRelated]:
 
 
 def _extract_catalog_record(  # noqa:C901
-    tag: Element, *, ror_grounder: ssslm.Grounder, mesh_grounder: ssslm.Grounder
+    tag: Element,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
 ) -> CatalogRecord | None:
     nlm_catalog_id = tag.findtext("NlmUniqueID")
     if not nlm_catalog_id:
@@ -448,7 +452,7 @@ def _extract_catalog_record(  # noqa:C901
 
     authors, collectives = [], []
     for i, x in enumerate(tag.findall(".//AuthorList/Author"), start=1):
-        match parse_author(i, x, ror_grounder=ror_grounder):
+        match parse_author(i, x, ror_grounder=ror_grounder, author_grounder=author_grounder):
             case Author() as author:
                 authors.append(author)
             case Collective() as collective:
@@ -619,9 +623,11 @@ def iterate_process_catalog(
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
     import pyobo
+    from orcid_downloader.lexical import get_orcid_grounder
 
     ror_grounder = pyobo.get_grounder("ror")
     mesh_grounder = pyobo.get_grounder("mesh")
+    author_grounder = get_orcid_grounder()
 
     for path in tqdm(ensure_serfile_catalog(force=force), desc="Processing NLM Catalog"):
         yield from _parse_catalog(
@@ -629,6 +635,7 @@ def iterate_process_catalog(
             force_process=force_process or force,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
         )
 
 
@@ -648,6 +655,7 @@ def _parse_catalog(
     force_process: bool = False,
     ror_grounder: ssslm.Grounder,
     mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
 ) -> Iterable[CatalogRecord]:
     cache_path = path.with_suffix(".json.gz")
     if cache_path.is_file() and not force_process and False:
@@ -661,7 +669,10 @@ def _parse_catalog(
         catalog_records = []
         for tag in tree.findall("NLMCatalogRecord"):
             catalog_record = _extract_catalog_record(
-                tag, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+                tag,
+                ror_grounder=ror_grounder,
+                mesh_grounder=mesh_grounder,
+                author_grounder=author_grounder,
             )
             if catalog_record:
                 catalog_records.append(catalog_record)

@@ -6,12 +6,15 @@ import datetime
 import functools
 import gzip
 import itertools as itt
-import json
 import logging
+import multiprocessing as mp
+import os
+import sys
 import typing
 from collections.abc import Iterable
+from itertools import chain
 from pathlib import Path
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TextIO, TypeAlias
 from xml.etree.ElementTree import Element
 
 import click
@@ -26,6 +29,7 @@ from more_click import verbose_option
 from pydantic import BaseModel, Field
 from pystow.utils import safe_open_writer
 from tqdm import tqdm
+from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map
 from tqdm.contrib.logging import logging_redirect_tqdm
 
@@ -35,7 +39,6 @@ from .utils import (
     Author,
     Collective,
     Heading,
-    _json_default,
     parse_author,
     parse_date,
     parse_mesh_heading,
@@ -66,6 +69,9 @@ BASELINE_MODULE = MODULE.module("baseline")
 UPDATES_MODULE = MODULE.module("updates")
 EDGES_PATH = MODULE.join(name="edges.tsv.gz")
 SSSOM_PATH = MODULE.join(name="articles.sssom.tsv.gz")
+TEST_PATH = MODULE.join(name="articles-test.sssom.tsv")
+UPDATES_PATH = MODULE.join(name="updates.html")
+BASELINE_PATH = MODULE.join(name="baseline.html")
 
 
 def _download_baseline(url: str) -> Path:
@@ -197,10 +203,16 @@ class Article(BaseModel):
         return "D016441" in self.type_mesh_ids
 
 
-def _get_urls(url: str) -> list[str]:
-    res = requests.get(url, timeout=300)
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, "html.parser")
+def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
+    if cache_path.is_file() and not force:
+        text = cache_path.read_text()
+    else:
+        res = requests.get(url, timeout=300)
+        res.raise_for_status()
+        text = res.text
+        cache_path.write_text(text)
+
+    soup = BeautifulSoup(text, "html.parser")
     return sorted(
         (
             url + href  # type:ignore
@@ -212,7 +224,12 @@ def _get_urls(url: str) -> list[str]:
 
 
 def _parse_from_path(
-    path: Path, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
+    position: int | None = None,
 ) -> Iterable[Article]:
     try:
         tree = etree.parse(path)
@@ -220,16 +237,30 @@ def _parse_from_path(
         tqdm.write(f"failed to parse {path}")
         return
 
-    for pubmed_article in tree.findall("PubmedArticle"):
+    for pubmed_article in tqdm(
+        tree.findall("PubmedArticle"),
+        unit="article",
+        unit_scale=True,
+        leave=False,
+        desc=f"parsing {path.name}",
+        position=position,
+    ):
         article = _extract_article(
-            pubmed_article, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder
+            pubmed_article,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
         )
         if article:
             yield article
 
 
 def _extract_article(  # noqa:C901
-    element: Element, *, ror_grounder: ssslm.Grounder | None, mesh_grounder: ssslm.Grounder | None
+    element: Element,
+    *,
+    ror_grounder: ssslm.Grounder | None,
+    mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
 ) -> Article | None:
     medline_citation: Element | None = element.find("MedlineCitation")
     if medline_citation is None:
@@ -315,6 +346,7 @@ def _extract_article(  # noqa:C901
                 author_tag,
                 ror_grounder=ror_grounder,
                 doc_key=pubmed,
+                author_grounder=author_grounder,
             )
         )
     ]
@@ -427,20 +459,19 @@ def _parse_grant(element: Element, *, ror_grounder: ssslm.Grounder | None) -> Gr
     )
 
 
-Source: TypeAlias = Literal["remote", "local"]
-
-
-def ensure_baselines(*, source: Source | None = None) -> list[Path]:
+def ensure_baselines(*, force: bool, source: Source | None = None) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_baselines(source=source))
+    return list(iterate_ensure_baselines(force=force, source=source))
 
 
-def iterate_ensure_baselines(*, source: Source | None = None) -> Iterable[Path]:
+def iterate_ensure_baselines(
+    *, source: Source | None = None, force: bool = False
+) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
     if source == "remote" or source is None:
         yield from thread_map(
             _download_baseline,
-            _get_urls(BASELINE_URL),
+            _ensure_urls(BASELINE_URL, BASELINE_PATH, force=force),
             desc="Downloading PubMed baseline",
             leave=False,
         )
@@ -448,6 +479,9 @@ def iterate_ensure_baselines(*, source: Source | None = None) -> Iterable[Path]:
         yield from BASELINE_MODULE.base.glob("*.xml.gz")
     else:
         raise ValueError
+
+
+Source: TypeAlias = Literal["remote", "local"]
 
 
 def process_baselines(
@@ -463,18 +497,19 @@ def iterate_process_baselines(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
+    force_listing: bool = False,
     source: Source | None = None,
-    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process all baseline files."""
-    paths = ensure_baselines(source=source)
+    paths = ensure_baselines(force=force_listing, source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
-        ground=ground,
         unit="baseline",
     )
 
@@ -484,52 +519,56 @@ def _shared_process(
     *,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     force_process: bool = False,
     unit: str,
     multiprocessing: bool = False,
-    ground: bool = True,
 ) -> Iterable[Article]:
-    if ground:
-        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
-    else:
-        ror_grounder, mesh_grounder = None, None
-
     tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
     if multiprocessing:
+        n_workers = (os.cpu_count() or 5) - 2
+        mp.set_start_method("spawn", force=True)
+        lock = mp.RLock()
+        tqdm.set_lock(lock)
         # multiprocessing can't return generators, needs to consumed into lists
         func = functools.partial(
             _process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
+            n_workers=n_workers,
         )
-        xxx = process_map(func, paths, **tqdm_kwargs, chunksize=3, max_workers=10)
+        xxx = process_map(func, paths, **tqdm_kwargs, chunksize=1, max_workers=n_workers)
     else:
         func = functools.partial(
             _iterate_process_xml_gz,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
         )
-        xxx = map(func, tqdm(paths, **tqdm_kwargs))
+        xxx = tmap(func, paths, **tqdm_kwargs)
 
     return itt.chain.from_iterable(xxx)
 
 
 def ensure_updates(
     *,
+    force: bool,
     source: Source | None = None,
 ) -> list[Path]:
     """Ensure all the baseline files are downloaded."""
-    return list(iterate_ensure_updates(source=source))
+    return list(iterate_ensure_updates(force=force, source=source))
 
 
-def iterate_ensure_updates(*, source: Source | None = None) -> Iterable[Path]:
+def iterate_ensure_updates(*, force: bool = False, source: Source | None = None) -> Iterable[Path]:
     """Ensure all the baseline files are downloaded."""
     if source is None or source == "remote":
+        urls = _ensure_urls(UPDATES_URL, UPDATES_PATH, force=force)
         yield from thread_map(
             _download_updates,
-            _get_urls(UPDATES_URL),
+            urls,
             desc="Downloading PubMed updates",
             leave=False,
         )
@@ -547,18 +586,30 @@ def process_updates(*, force_process: bool = False) -> list[Article]:
 def _ensure_grounders(
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
-) -> tuple[ssslm.Grounder, ssslm.Grounder]:
+    author_grounder: ssslm.Grounder | None = None,
+) -> tuple[ssslm.Grounder, ssslm.Grounder, ssslm.Grounder]:
     if ror_grounder is None:
         import pyobo
 
+        logger.info("getting ROR grounder")
         ror_grounder = pyobo.get_grounder("ror")
+        logger.info("done getting ROR grounder")
 
     if mesh_grounder is None:
         import pyobo
 
+        logger.info("getting MeSH grounder")
         mesh_grounder = pyobo.get_grounder("mesh")
+        logger.info("done getting MeSH grounder")
 
-    return ror_grounder, mesh_grounder
+    if author_grounder is None:
+        from orcid_downloader.lexical import get_orcid_grounder
+
+        logger.info("getting ORCiD grounder")
+        author_grounder = get_orcid_grounder()
+        logger.info("done getting ORCiD grounder")
+
+    return ror_grounder, mesh_grounder, author_grounder
 
 
 def iterate_process_updates(
@@ -567,29 +618,37 @@ def iterate_process_updates(
     multiprocessing: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
+    force_listing: bool = False,
     source: Source | None = None,
-    ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process updates."""
-    paths = ensure_updates(source=source)
+    paths = ensure_updates(force=force_listing, source=source)
     return _shared_process(
         paths=paths,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         force_process=force_process,
         multiprocessing=multiprocessing,
-        ground=ground,
-        unit="updates",
+        unit="update",
     )
 
 
 def process_articles(
-    *, force_process: bool = False, multiprocessing: bool = False, source: Source | None = None
+    *,
+    force_process: bool = False,
+    multiprocessing: bool = False,
+    force_listing: bool = False,
+    source: Source | None = None,
 ) -> list[Article]:
     """Ensure and process articles from baseline, then updates."""
     return list(
         iterate_process_articles(
-            force_process=force_process, multiprocessing=multiprocessing, source=source
+            force_process=force_process,
+            multiprocessing=multiprocessing,
+            force_listing=force_listing,
+            source=source,
         )
     )
 
@@ -599,37 +658,44 @@ def iterate_process_articles(
     force_process: bool = False,
     ror_grounder: ssslm.Grounder | None = None,
     mesh_grounder: ssslm.Grounder | None = None,
+    author_grounder: ssslm.Grounder | None = None,
     multiprocessing: bool = False,
+    force_listing: bool = False,
     source: Source | None = None,
     ground: bool = True,
 ) -> Iterable[Article]:
     """Ensure and process articles from baseline, then updates."""
+    """Ensure and process articles from baseline, then updates."""
     if ground:
-        ror_grounder, mesh_grounder = _ensure_grounders(ror_grounder, mesh_grounder)
+        ror_grounder, mesh_grounder, author_grounder = _ensure_grounders(
+            ror_grounder, mesh_grounder, author_grounder
+        )
     else:
-        ror_grounder, mesh_grounder = None, None
+        ror_grounder, mesh_grounder, author_grounder = None, None, None
     yield from iterate_process_updates(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
+        force_listing=force_listing,
         source=source,
-        ground=ground,
     )
     yield from iterate_process_baselines(
         force_process=force_process,
         ror_grounder=ror_grounder,
         mesh_grounder=mesh_grounder,
+        author_grounder=author_grounder,
         multiprocessing=multiprocessing,
+        force_listing=force_listing,
         source=source,
-        ground=ground,
     )
 
 
-def iterate_ensure_articles(*, source: Source | None = None) -> Iterable[Path]:
+def iterate_ensure_articles(*, force: bool = False, source: Source | None = None) -> Iterable[Path]:
     """Ensure articles from baseline, then updates."""
-    yield from iterate_ensure_updates(source=source)
-    yield from iterate_ensure_baselines(source=source)
+    yield from iterate_ensure_updates(force=force, source=source)
+    yield from iterate_ensure_baselines(force=force, source=source)
 
 
 def _process_xml_gz(
@@ -637,7 +703,9 @@ def _process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder | None,
     mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
+    n_workers: int | None = None,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
     return list(
@@ -645,7 +713,9 @@ def _process_xml_gz(
             path=path,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
             force_process=force_process,
+            n_workers=n_workers,
         )
     )
 
@@ -655,27 +725,42 @@ def _iterate_process_xml_gz(
     *,
     ror_grounder: ssslm.Grounder | None,
     mesh_grounder: ssslm.Grounder | None,
+    author_grounder: ssslm.Grounder | None,
     force_process: bool = False,
+    n_workers: int | None = None,
 ) -> Iterable[Article]:
     """Process an XML file, cache a JSON version, and return it."""
+    if n_workers:
+        # Worker identity is 1-based
+        worker_id = mp.current_process()._identity[0] - 1
+        # add one back in since there's an outer progress bar that should always
+        # be in the first position
+        position = 1 + worker_id % n_workers
+    else:
+        position = None
+
     new_name = path.stem.removesuffix(".xml")
-    new_path = path.with_stem(new_name).with_suffix(".json.gz")
+    new_path = path.with_stem(new_name).with_suffix(".jsonl.gz")
     if new_path.is_file() and not force_process:
         with gzip.open(new_path, mode="rt") as file:
-            for part in json.load(file):
-                yield Article.model_validate(part)
+            for line in file:
+                yield Article.model_validate_json(line)
 
     else:
-        with logging_redirect_tqdm():
-            models = list(
-                _parse_from_path(path, ror_grounder=ror_grounder, mesh_grounder=mesh_grounder)
-            )
-
-        processed = [model.model_dump(exclude_none=True, exclude_defaults=True) for model in models]
-        with gzip.open(new_path, mode="wt") as file:
-            json.dump(processed, file, default=_json_default)
-
-        yield from models
+        with logging_redirect_tqdm(), gzip.open(new_path, mode="wt") as file:
+            for model in _parse_from_path(
+                path,
+                ror_grounder=ror_grounder,
+                mesh_grounder=mesh_grounder,
+                author_grounder=author_grounder,
+                position=position,
+            ):
+                file.write(
+                    model.model_dump_json(
+                        exclude_none=True, exclude_defaults=True, ensure_ascii=False
+                    )
+                )
+                yield model
 
 
 def get_edges(*, force_process: bool = False, **kwargs: Any) -> list[Triple]:
@@ -693,9 +778,11 @@ def iterate_edges(**kwargs: Any) -> Iterable[Triple]:
         yield from article._triples()
 
 
-def save_sssom(**kwargs: Any) -> None:
+def save_sssom(*, path: str | Path | TextIO | None = None, **kwargs: Any) -> None:
     """Save an SSSOM file for articles."""
-    with safe_open_writer(SSSOM_PATH) as writer:
+    if path is None:
+        path = SSSOM_PATH
+    with safe_open_writer(path) as writer:
         for article in iterate_process_articles(**kwargs):
             p = f"pubmed:{article.pubmed}"
             for xref in article.xrefs:
@@ -703,14 +790,57 @@ def save_sssom(**kwargs: Any) -> None:
 
 
 @click.command(name="articles")
-@click.option("-f", "--force-process", is_flag=True)
-@click.option("-m", "--multiprocessing", is_flag=True)
+@click.option(
+    "-f",
+    "--force-process",
+    is_flag=True,
+    help="If given, re-processes the articles. Does not re-download.",
+)
+@click.option("-m", "--multiprocessing", is_flag=True, help="Should multiprocessing get used?")
 @verbose_option
-@click.option("--source", type=click.Choice(list(typing.get_args(Source))))
-def _main(force_process: bool, multiprocessing: bool, source: Source | None) -> None:
+@click.option(
+    "--source",
+    type=click.Choice(list(typing.get_args(Source))),
+    default="remote",
+    help="Choose where the index of files comes from. Remote means that the NCBI FTP server is "
+    "queried, which is flaky. Local means a previous cache of the index is used.",
+)
+@click.option(
+    "--ground/--no-ground",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Should MeSH terms, organizations, and authors get grounded?",
+)
+@click.option(
+    "--clear",
+    is_flag=True,
+    help="Delete cached JSON/JSONL files for articles, then exit without doing any processing. "
+    "Useful for cleaning up and iteratively developing the processor.",
+)
+def _main(
+    force_process: bool, multiprocessing: bool, source: Source | None, ground: bool, clear: bool
+) -> None:
     """Download and process articles."""
+    if clear:
+        click.secho("deleting cached JSON/JSONL files", fg="yellow")
+        click.confirm("Are you sure you want to delete the cached JSON/JSONL files?", abort=True)
+        for path in tqdm(
+            list(
+                chain(
+                    BASELINE_MODULE.base.glob("*.json.gz"),
+                    BASELINE_MODULE.base.glob("*.jsonl.gz"),
+                    UPDATES_MODULE.base.glob("*.json.gz"),
+                    UPDATES_MODULE.base.glob("*.jsonl.gz"),
+                )
+            )
+        ):
+            tqdm.write(f"deleting {path}")
+            path.unlink()
+        sys.exit(0)
+
     for _ in iterate_process_articles(
-        force_process=force_process, multiprocessing=multiprocessing, source=source
+        force_process=force_process, multiprocessing=multiprocessing, source=source, ground=ground
     ):
         pass
 
