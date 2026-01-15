@@ -759,6 +759,7 @@ def _iterate_process_xml_gz(
                     model.model_dump_json(
                         exclude_none=True, exclude_defaults=True, ensure_ascii=False
                     )
+                    + "\n"
                 )
                 yield model
 
