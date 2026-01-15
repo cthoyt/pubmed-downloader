@@ -745,9 +745,13 @@ def _iterate_process_xml_gz(
         with gzip.open(new_path, mode="rt") as file:
             for line in file:
                 yield Article.model_validate_json(line)
-
     else:
-        with logging_redirect_tqdm(), gzip.open(new_path, mode="wt") as file:
+        # write everything to a temporary path, then rename it
+        # to the desired path at the end. this makes it so if
+        # we cut off work in the middle, then we don't get weirdly
+        # out of sync
+        new_tmp_path = path.with_stem(new_name + "-tmp").with_suffix(".jsonl.gz")
+        with logging_redirect_tqdm(), gzip.open(new_tmp_path, mode="wt") as file:
             for model in _parse_from_path(
                 path,
                 ror_grounder=ror_grounder,
@@ -762,6 +766,7 @@ def _iterate_process_xml_gz(
                     + "\n"
                 )
                 yield model
+        new_tmp_path.rename(new_path)
 
 
 def get_edges(*, force_process: bool = False, **kwargs: Any) -> list[Triple]:
