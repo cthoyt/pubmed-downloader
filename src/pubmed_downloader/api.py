@@ -209,6 +209,11 @@ class Article(BaseModel):
         # see https://www.ncbi.nlm.nih.gov/mesh/68016441
         return "D016441" in self.type_mesh_ids
 
+    def is_review(self) -> bool:
+        """Check if the article is a review."""
+        # see https://www.ncbi.nlm.nih.gov/mesh/D016454
+        return "D016454" in self.type_mesh_ids
+
 
 def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
     if cache_path.is_file() and not force:
