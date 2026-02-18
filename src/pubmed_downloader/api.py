@@ -167,6 +167,13 @@ class Article(BaseModel):
     grants: list[Grant] = Field(default_factory=list)
 
     @property
+    def year(self) -> int | None:
+        """The year the article was published."""
+        if self.journal_issue.published:
+            return self.journal_issue.published.year
+        return None
+
+    @property
     def date_published(self) -> datetime.date | None:
         """Get the date published from the journal issue."""
         return self.journal_issue.published
