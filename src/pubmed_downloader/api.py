@@ -291,12 +291,12 @@ def _extract_article(  # noqa:C901
     title_tag = article.find("ArticleTitle")
     if title_tag is None:
         raise ValueError(f"[pubmed:{pubmed}] is missing an ArticleTitle tag")
-    title = title_tag.text
+    title = "".join(title_tag.itertext())
     if title is None:
         logger.debug(
             "[pubmed:%s] has an empty ArticleTitle tag:%s",
             pubmed,
-            etree.tostring(element, pretty_print=True, encoding="unicode"),
+            etree.tostring(title_tag, pretty_print=True, encoding="unicode"),
         )
         return None
 
@@ -340,10 +340,11 @@ def _extract_article(  # noqa:C901
 
     abstract_texts = []
     for abstract_text_tag in medline_citation.findall(".//Abstract/AbstractText"):
-        if not abstract_text_tag.text:
+        text = "".join(abstract_text_tag.itertext())
+        if not text:
             continue
         abstract_text = AbstractText(
-            text=abstract_text_tag.text,
+            text=text,
             label=abstract_text_tag.attrib.get("Label"),
             category=abstract_text_tag.attrib.get("NlmCategory"),
         )

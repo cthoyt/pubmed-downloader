@@ -1,0 +1,842 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2025//EN"
+        "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_250101.dtd">
+<PubmedArticleSet>
+    <PubmedArticle>
+        <MedlineCitation Status="PubMed-not-MEDLINE" Owner="NLM">
+            <PMID Version="1">37041114</PMID>
+            <DateCompleted>
+                <Year>2023</Year>
+                <Month>06</Month>
+                <Day>26</Day>
+            </DateCompleted>
+            <DateRevised>
+                <Year>2023</Year>
+                <Month>06</Month>
+                <Day>26</Day>
+            </DateRevised>
+            <Article PubModel="Print-Electronic">
+                <Journal>
+                    <ISSN IssnType="Electronic">1864-564X</ISSN>
+                    <JournalIssue CitedMedium="Internet">
+                        <Volume>16</Volume>
+                        <Issue>12</Issue>
+                        <PubDate>
+                            <Year>2023</Year>
+                            <Month>Jun</Month>
+                            <Day>22</Day>
+                        </PubDate>
+                    </JournalIssue>
+                    <Title>ChemSusChem</Title>
+                    <ISOAbbreviation>ChemSusChem</ISOAbbreviation>
+                </Journal>
+                <ArticleTitle>A Multitool for Circular Economy: Fast Ring-Opening Polymerization and Chemical Recycling
+                    of (Bio)polyesters Using a Single Aliphatic Guanidine Carboxy Zinc Catalyst.
+                </ArticleTitle>
+                <Pagination>
+                    <StartPage>e202300192</StartPage>
+                    <MedlinePgn>e202300192</MedlinePgn>
+                </Pagination>
+                <ELocationID EIdType="doi" ValidYN="Y">10.1002/cssc.202300192</ELocationID>
+                <Abstract>
+                    <AbstractText>A new aliphatic hybrid guanidine N,O-donor ligand (TMGeech) and its zinc chloride
+                        complex ([ZnCl<sub>2</sub> (TMGeech)]) are presented. This complex displays high catalytic
+                        activity for the ring-opening polymerization (ROP) of lactide in toluene, exceeding the toxic
+                        industry standard tin octanoate by a factor of 10. The high catalytic activity of [ZnCl<sub>2
+                        </sub> (TMGeech)] is further demonstrated under industrially preferred melt conditions, reaching
+                        high lactide conversions within seconds. To bridge the gap towards a sustainable circular
+                        (bio)economy, the catalytic activity of [ZnCl<sub>2</sub> (TMGeech)] for the chemical recycling
+                        of polylactide (PLA) by alcoholysis in THF is investigated. Fast production of different
+                        value-added lactates at mild temperatures is demonstrated. Selective PLA degradation from
+                        mixtures with polyethylene terephthalate (PET) and a polymer blend, catalyst recycling, and a
+                        detailed kinetic analysis are presented. For the first time, chemical recycling of post-consumer
+                        PET producing different value-added materials is demonstrated using a guanidine-based zinc
+                        catalyst. Therefore, [ZnCl<sub>2</sub> (TMGeech)] is a promising, highly active multitool, not
+                        only to implement a circular (bio)plastics economy, but also to tackle today's ongoing plastics
+                        pollution.
+                    </AbstractText>
+                    <CopyrightInformation>&#xa9; 2023 The Authors. ChemSusChem published by Wiley-VCH GmbH.
+                    </CopyrightInformation>
+                </Abstract>
+                <AuthorList CompleteYN="Y">
+                    <Author ValidYN="Y">
+                        <LastName>Fuchs</LastName>
+                        <ForeName>Martin</ForeName>
+                        <Initials>M</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Sch&#xe4;fer</LastName>
+                        <ForeName>Pascal M</ForeName>
+                        <Initials>PM</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Wagner</LastName>
+                        <ForeName>Wolf</ForeName>
+                        <Initials>W</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Krumm</LastName>
+                        <ForeName>Ian</ForeName>
+                        <Initials>I</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Walbeck</LastName>
+                        <ForeName>Marcel</ForeName>
+                        <Initials>M</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Dietrich</LastName>
+                        <ForeName>Regina</ForeName>
+                        <Initials>R</Initials>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Hoffmann</LastName>
+                        <ForeName>Alexander</ForeName>
+                        <Initials>A</Initials>
+                        <Identifier Source="ORCID">0000-0002-9647-8839</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                    <Author ValidYN="Y">
+                        <LastName>Herres-Pawlis</LastName>
+                        <ForeName>Sonja</ForeName>
+                        <Initials>S</Initials>
+                        <Identifier Source="ORCID">0000-0002-4354-4353</Identifier>
+                        <AffiliationInfo>
+                            <Affiliation>Institut f&#xfc;r Anorganische Chemie, RWTH Aachen University, Landoltweg 1A,
+                                52072, Aachen, Germany.
+                            </Affiliation>
+                        </AffiliationInfo>
+                    </Author>
+                </AuthorList>
+                <Language>eng</Language>
+                <GrantList CompleteYN="Y">
+                    <Grant>
+                        <GrantID>953073</GrantID>
+                        <Agency>H2020 European Research Council</Agency>
+                        <Country/>
+                    </Grant>
+                </GrantList>
+                <PublicationTypeList>
+                    <PublicationType UI="D016428">Journal Article</PublicationType>
+                </PublicationTypeList>
+                <ArticleDate DateType="Electronic">
+                    <Year>2023</Year>
+                    <Month>06</Month>
+                    <Day>01</Day>
+                </ArticleDate>
+            </Article>
+            <MedlineJournalInfo>
+                <Country>Germany</Country>
+                <MedlineTA>ChemSusChem</MedlineTA>
+                <NlmUniqueID>101319536</NlmUniqueID>
+                <ISSNLinking>1864-5631</ISSNLinking>
+            </MedlineJournalInfo>
+            <ChemicalList>
+                <Chemical>
+                    <RegistryNumber>J41CSQ7QDS</RegistryNumber>
+                    <NameOfSubstance UI="D015032">Zinc</NameOfSubstance>
+                </Chemical>
+                <Chemical>
+                    <RegistryNumber>JU58VJ6Y3B</RegistryNumber>
+                    <NameOfSubstance UI="D019791">Guanidine</NameOfSubstance>
+                </Chemical>
+                <Chemical>
+                    <RegistryNumber>0</RegistryNumber>
+                    <NameOfSubstance UI="D010969">Plastics</NameOfSubstance>
+                </Chemical>
+                <Chemical>
+                    <RegistryNumber>0</RegistryNumber>
+                    <NameOfSubstance UI="D011093">Polyethylene Terephthalates</NameOfSubstance>
+                </Chemical>
+                <Chemical>
+                    <RegistryNumber>0</RegistryNumber>
+                    <NameOfSubstance UI="D006146">Guanidines</NameOfSubstance>
+                </Chemical>
+            </ChemicalList>
+            <CitationSubset>IM</CitationSubset>
+            <MeshHeadingList>
+                <MeshHeading>
+                    <DescriptorName UI="D058105" MajorTopicYN="N">Polymerization</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D015032" MajorTopicYN="Y">Zinc</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D019791" MajorTopicYN="N">Guanidine</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D007700" MajorTopicYN="N">Kinetics</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D010969" MajorTopicYN="Y">Plastics</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D011093" MajorTopicYN="N">Polyethylene Terephthalates</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D006146" MajorTopicYN="N">Guanidines</DescriptorName>
+                </MeshHeading>
+                <MeshHeading>
+                    <DescriptorName UI="D059027" MajorTopicYN="N">Recycling</DescriptorName>
+                </MeshHeading>
+            </MeshHeadingList>
+            <KeywordList Owner="NOTNLM">
+                <Keyword MajorTopicYN="N">alcoholysis</Keyword>
+                <Keyword MajorTopicYN="N">chemical recycling</Keyword>
+                <Keyword MajorTopicYN="N">polyethylene terephthalate</Keyword>
+                <Keyword MajorTopicYN="N">polylactide</Keyword>
+                <Keyword MajorTopicYN="N">ring-opening polymerization</Keyword>
+            </KeywordList>
+        </MedlineCitation>
+        <PubmedData>
+            <History>
+                <PubMedPubDate PubStatus="revised">
+                    <Year>2023</Year>
+                    <Month>3</Month>
+                    <Day>19</Day>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="received">
+                    <Year>2023</Year>
+                    <Month>2</Month>
+                    <Day>8</Day>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="medline">
+                    <Year>2023</Year>
+                    <Month>6</Month>
+                    <Day>26</Day>
+                    <Hour>6</Hour>
+                    <Minute>41</Minute>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="pubmed">
+                    <Year>2023</Year>
+                    <Month>4</Month>
+                    <Day>12</Day>
+                    <Hour>6</Hour>
+                    <Minute>0</Minute>
+                </PubMedPubDate>
+                <PubMedPubDate PubStatus="entrez">
+                    <Year>2023</Year>
+                    <Month>4</Month>
+                    <Day>11</Day>
+                    <Hour>22</Hour>
+                    <Minute>52</Minute>
+                </PubMedPubDate>
+            </History>
+            <PublicationStatus>ppublish</PublicationStatus>
+            <ArticleIdList>
+                <ArticleId IdType="pubmed">37041114</ArticleId>
+                <ArticleId IdType="doi">10.1002/cssc.202300192</ArticleId>
+            </ArticleIdList>
+            <ReferenceList>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. Geyer, J. R. Jambeck, K. L. Law, Sci. Adv. 2017, 3, e1700782;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Plastics Europe, 2021, pp.&#x2005;1-34.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. R. Jambeck, R. Geyer, C. Wilcox, T. R. Siegler, M. Perryman, A. Andrady, R. Narayan, K.
+                        L. Law, Science 2015, 347, 768-771.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. C. Hale, B. Song, Environ. Sci. Technol. 2020, 54, 7034-7036;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>N. Parashar, S. Hait, Sci. Total Environ. 2021, 759, 144274-144289.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Shamsuyeva, H.-J. Endres, JCOMC 2021, 6, 100168-100184.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. M. Garcia, M. L. Robertson, Science 2017, 358, 870-872.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>K. Ragaert, L. Delva, K. Van Geem, Waste Manage. 2017, 69, 24-58;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>T. Thiounn, R. C. Smith, J. Polym. Sci. 2020, 58, 1347-1364.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. Payne, M. D. Jones, ChemSusChem 2021, 14, 4041-4070.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. Meys, A. Katelhon, M. Bachmann, B. Winter, C. Zibunas, S. Suh, A. Bardow, Science 2021,
+                        374, 71-76.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. G. Rosenboom, R. Langer, G. Traverso, Nat. Rev. Mater. 2022, 7, 117-137.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>H.-J. Endres, A. Siebert-Raths, in Technische Biopolymere, Hanser Verlag, 2009.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. S. Lehnertz, J. B. Mensah, R. Palkovits, Green Chem. 2022, 24, 3957-3963;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. L. Merchan, T. Fisch&#xf6;der, J. Hee, M. S. Lehnertz, O. Osterthun, S. Pielsticker, J.
+                        Schleier, T. Tiso, L. M. Blank, J. Klankermayer, R. Kneer, P. Quicker, G. Walther, R. Palkovits,
+                        Green Chem. 2022, 24, 9428-9449.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>K. Masutani, Y. Kimura, in PLA synthesis. From the monomer to the polymer, Royal Society
+                        of Chemistry, 2014.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. Moya-Lopez, J. Gonzalez-Fuentes, I. Bravo, D. Chapron, P. Bourson, C. Alonso-Moreno, D.
+                        Hermida-Merino, Pharmaceutica 2022, 14, 1673-1709;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. Auras, B. Harte, S. Selke, Macromol. Biosci. 2004, 4, 835-864;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. A. Auras, L. T. Lim, S. E. M. Selke, H. Tsuji, in Poly(Lactic Acid), 2&#x2005;ed.,
+                        2022.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>European Bioplastics, Berlin, 2021.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. McKeown, M. D. Jones, Sustain. Chem. 2020, 1, 1-22;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. Van Wouwe, M. Dusselier, E. Vanleeuw, B. Sels, ChemSusChem 2016, 9, 907-921.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. Payne, P. McKeown, M. F. Mahon, E. A. Emanuelsson, M. D. Jones, Polym. Chem. 2020, 11,
+                        2381-2389;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Hermann, T. Becker, M. A. Sch&#xe4;fer, A. Hoffmann, S. Herres-Pawlis, ChemSusChem
+                        2022, 15, e202201075;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. Payne, P. McKeown, O. Driscoll, G. Kociok-K&#xf6;hn, E. A. C. Emanuelsson, M. D. Jones,
+                        Polym. Chem. 2021, 12, 1086-1096;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Fuchs, M. Walbeck, E. Jagla, A. Hoffmann, S. Herres-Pawlis, ChemPlusChem 2022, 87,
+                        e202200029;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. Stewart, M. Fuchs, J. Payne, O. Driscoll, G. Kociok-Kohn, B. D. Ward, S. Herres-Pawlis,
+                        M. D. Jones, RSC Adv. 2022, 12, 1416-1424;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. McKeown, L. A. Roman-Ramirez, S. Bates, J. Wood, M. D. Jones, ChemSusChem 2019, 12,
+                        5233-5238;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>F. Santulli, M. Lamberti, M. Mazzeo, ChemSusChem 2021, 14, 5470-5475;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>E. Cheung, C. Alberti, S. Enthaler, ChemistryOpen 2020, 9, 1224-1228.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. Jacobsen, H. G. Fritz, P. Deg&#xe9;e, P. Dubois, R. J&#xe9;r&#xf4;me, Polym. Eng. Sci.
+                        1999, 39, 1311-1319;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>O. Dechy-Cabaret, B. Martin-Vaca, D. Bourissou, Chem. Rev. 2004, 104, 6147-6176;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Stjerndahl, A. Finne-Wistrand, A. C. Albertsson, C. M. Backesjo, U. Lindgren, J.
+                        Biomed. Mater. Res. 2008, 87, 1086-1091;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Stjerndahl, A. F. Wistrand, A. C. Albertsson, Biomacromolecules 2007, 8, 937-940;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. C. Tanzi, P. Verderio, M. G. Lampugnani, M. Resnati, E. Dejana, E. Sturani, J. Mater.
+                        Sci. Mater. Med. 1994, 5, 393-396;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. Xia, S. S. Lam, H. Zhong, E. Fabbri, C. Sonne, Science 2022, 378, 842.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>F. Santulli, I. D'Auria, L. Boggioni, S. Losio, M. Proverbio, C. Costabile, M. Mazzeo,
+                        Organometallics 2020, 39, 1213-1220;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. McKeown, M. G. Davidson, G. Kociok-Kohn, M. D. Jones, Chem. Commun. 2016, 52,
+                        10431-10434;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J.-C. Buffet, J. Okuda, Polym. Chem. 2011, 2, 2758-2763;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. D. Rittinghaus, P. M. Sch&#xe4;fer, P. Albrecht, C. Conrads, A. Hoffmann, A. N.
+                        Ksiazkiewicz, O. Bienemann, A. Pich, S. Herres-Pawlis, ChemSusChem 2019, 12, 2161-2165;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>O. J. Driscoll, C. H. Hafford-Tear, P. McKeown, J. A. Stewart, G. Kociok-Kohn, M. F.
+                        Mahon, M. D. Jones, Dalton Trans. 2019, 48, 15049-15058;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. V. S. Nylund, B. Monney, C. Weder, M. Albrecht, Catal. Sci. Technol. 2022, 12,
+                        996-1004;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. D. Rittinghaus, A. Karabulut, A. Hoffmann, S. Herres-Pawlis, Angew. Chem. Int. Ed.
+                        Engl. 2021, 60, 21795-21800;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Angew. Chem. 2021, 113, 21965-21971;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. D. Rittinghaus, J. Zenner, A. Pich, M. Kol, S. Herres-Pawlis, Angew. Chem. Int. Ed.
+                        Engl. 2022, 61, e202112853;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Angew. Chem. 2022, 113, e202112853;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. McKeown, S. N. McCormick, M. F. Mahon, M. D. Jones, Polym. Chem. 2018, 9, 5339-5347;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>H. Shere, P. McKeown, M. F. Mahon, M. D. Jones, Eur. Polym. J. 2019, 114, 319-325;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>V. Vaillant-Coindard, B. Th&#xe9;ron, G. Printz, F. Chotard, C. Balan, Y. Rousselin, P.
+                        Richard, I. Tolbatov, P. Fleurat-Lessard, E. Bodio, R. Malacea-Kabbara, J. Bayardon, S. Dagorne,
+                        P. Le Gendre, Organometallics 2022, 41, 2920-2932;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. J. Chmura, C. J. Chuck, M. G. Davidson, M. D. Jones, M. D. Lunn, S. D. Bull, M. F.
+                        Mahon, Angew. Chem. Int. Ed. Engl. 2007, 46, 2280-2283;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Angew. Chem. 2007, 119, 2330-2333;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. F. Reema, A.-C. Albertsson, J. Polym. Sci. 2003, 41, 3074-3082;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>H. Ma, T. P. Spaniol, J. Okuda, Angew. Chem. Int. Ed. Engl. 2006, 45, 7818-7821;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Angew. Chem. 2006, 118, 7982-7985;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. J. Chmura, M. G. Davidson, C. J. Frankis, M. D. Jones, M. D. Lunn, Chem. Commun. 2008,
+                        1293-1295;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>B. J. Jeffery, E. L. Whitelaw, D. Garcia-Vivo, J. A. Stewart, M. F. Mahon, M. G. Davidson,
+                        M. D. Jones, Chem. Commun. 2011, 47, 12328-12330;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Sauer, A. Kapelski, C. Fliedel, S. Dagorne, M. Kol, J. Okuda, Dalton Trans. 2013, 42,
+                        9007-9023.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Thevenon, C. Romain, M. S. Bennington, A. J. White, H. J. Davidson, S. Brooker, C. K.
+                        Williams, Angew. Chem. Int. Ed. Engl. 2016, 55, 8680-8685;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Angew. Chem. 2016, 128, 8822-8827;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>T. Rosen, Y. Popowski, I. Goldberg, M. Kol, Chem. Eur. J. 2016, 22, 11533-11536;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Fuchs, S. Schmitz, P. M. Sch&#xe4;fer, T. Secker, A. Metz, A. N. Ksiazkiewicz, A. Pich,
+                        P. K&#xf6;gerler, K. Y. Monakhov, S. Herres-Pawlis, Eur. Polym. J. 2020, 122, 109302;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Honrado, A. Otero, J. Fern&#xe1;ndez-Baeza, L. F. S&#xe1;nchez-Barba, A. Garc&#xe9;s,
+                        A. n. Lara-S&#xe1;nchez, A. M. Rodr&#xed;guez, Organometallics 2014, 33, 1859-1866;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Hermann, S. Hill, A. Metz, J. Heck, A. Hoffmann, L. Hartmann, S. Herres-Pawlis, Angew.
+                        Chem. Int. Ed. Engl. 2020, 59, 21778-21784;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Angew. Chem. 2020, 132, 21962-21968;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Metz, R. Plothe, B. Glowacki, A. Koszalkowski, M. Scheckenbach, A. Beringer, T. R&#xf6;sener,
+                        J. Michaelis de Vasconcellos, R. Haase, U. Fl&#xf6;rke, A. Hoffmann, S. Herres-Pawlis, Eur. J.
+                        Inorg. Chem. 2016, 2016, 4974-4987;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. Fliedel, V. Rosa, F. M. Alves, A. M. Martins, T. Aviles, S. Dagorne, Dalton Trans.
+                        2015, 44, 12376-12387;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>E. D. Akpan, S. O. Ojwach, B. Omondi, V. O. Nyamori, Polyhedron 2016, 110, 63-72;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. K. Williams, L. E. Breyfogle, S. K. Choi, W. Nam, V. G. Young, M. A. Hillmyer, W. B.
+                        Tolman, J. Am. Chem. Soc. 2003, 125, 11350-11359;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. C. Roberts, B. R. Barnett, D. B. Green, J. M. Fritsch, Organometallics 2012, 31,
+                        4133-4141;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>D. Jedrzkiewicz, G. Adamus, M. Kwiecien, L. John, J. Ejfler, Inorg. Chem. 2017, 56,
+                        1349-1365;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Honrado, S. Sobrino, J. Fernandez-Baeza, L. F. Sanchez-Barba, A. Garces, A.
+                        Lara-Sanchez, A. M. Rodriguez, Chem. Commun. 2019, 55, 8947-8950;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. Otero, J. Fernandez-Baeza, L. F. Sanchez-Barba, S. Sobrino, A. Garces, A. Lara-Sanchez,
+                        A. M. Rodriguez, Dalton Trans. 2017, 46, 15107-15117;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>N. M. Rezayee, K. A. Gerling, A. L. Rheingold, J. M. Fritsch, Dalton Trans. 2013, 42,
+                        5573-5586;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Z. Dai, J. Zhang, Y. Gao, N. Tang, Y. Huang, J. Wu, Catal. Sci. Technol. 2013, 3,
+                        3268-3277;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>D. J. Darensbourg, O. Karroonnirun, Macromolecules 2010, 43, 8880-8886;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. Fliedel, D. Vila-Vi&#xe7;osa, M. J. Calhorda, S. Dagorne, T. Avil&#xe9;s, ChemCatChem
+                        2014, 6, 1357-1367;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Y. Sun, Y. Cui, J. Xiong, Z. Dai, N. Tang, J. Wu, Dalton Trans. 2015, 44, 16383-16391;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. E. Chellali, A. K. Alverson, J. R. Robinson, ACS Catal. 2022, 12, 5585-5594;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. McKeown, J. Brown-Humes, M. G. Davidson, M. F. Mahon, T. J. Woodman, M. D. Jones,
+                        Dalton Trans. 2017, 46, 5048-5057.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. Steiniger, P. M. Sch&#xe4;fer, C. W&#xf6;lper, J. Henkel, A. N. Ksiazkiewicz, A. Pich,
+                        S. Herres-Pawlis, S. Schulz, Eur. J. Inorg. Chem. 2018, 2018, 4014-4021;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. Ghosh, P. M. Sch&#xe4;fer, D. Dittrich, C. Scheiper, P. Steiniger, G. Fink, A. N.
+                        Ksiazkiewicz, A. Tjaberings, C. Wolper, A. H. Groschel, A. Pich, S. Herres-Pawlis, S. Schulz,
+                        ChemistryOpen 2019, 8, 951-960.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. M. Sch&#xe4;fer, M. Fuchs, A. Ohligschl&#xe4;ger, R. Rittinghaus, P. McKeown, E. Akin,
+                        M. Schmidt, A. Hoffmann, M. A. Liauw, M. D. Jones, ChemSusChem 2017, 10, 3547-3556;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. M. Sch&#xe4;fer, P. McKeown, M. Fuchs, R. D. Rittinghaus, A. Hermann, J. Henkel, S.
+                        Seidel, C. Roitzheim, A. N. Ksiazkiewicz, A. Hoffmann, Dalton Trans. 2019, 48, 6071-6082.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. M. Sch&#xe4;fer, S. Herres-Pawlis, ChemPlusChem 2020, 85, 1044-1052.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. Lackmann, J. Brendt, T. B. Seiler, A. Hermann, A. Metz, P. M. Sch&#xe4;fer, S.
+                        Herres-Pawlis, H. Hollert, J. Hazard. Mater. 2021, 416, 125889.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P.&#x2005;M. Sch&#xe4;fer, RWTH Aachen University (Aachen), 2019.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>L. Yang, D. R. Powell, R. P. Houser, Dalton Trans. 2007, 955-964.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>V. Raab, K. Harms, J. Sundermeyer, B. Kova&#x10d;evi&#x107;, Z. B. Maksi&#x107;, J. Org.
+                        Chem. 2003, 68, 8790-8797.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. de&#x2005;Vos, P. Jansen, Industrial-Scale PLA Production from PURAC Lactides 2009,
+                        https://www.researchgate.net/publication/228836284_Industrial-Scale_PLA_Production_from_PURAC_Lactides.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>N. Conen, M. Fuchs, A. Hoffmann, S. Herres-Pawlis, A. Jupke, Adv. Sustainable Syst. 2022,
+                        2200359-2200372.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>L. Burkart, A. Eith, A. Hoffmann, S. Herres-Pawlis, Chem. Asian J. 2022, 18, e202201195.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>F. M. Lamberti, L. A. Roman-Ramirez, A. P. Dove, J. Wood, Polymer 2022, 14, 1763-1776.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>L. A. Rom&#xe1;n-Ram&#xed;rez, P. McKeown, M. D. Jones, J. Wood, ACS Catal. 2018, 9,
+                        409-416.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. Petrus, D. Bykowski, P. Sobota, ACS Catal. 2016, 6, 5222-5235.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>H. Ohara, A. Onogi, M. Yamamoto, S. Kobayashi, Biomacromolecules 2010, 11, 2008-2015.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. S. M. Pereira, V. M. T. M. Silva, A. E. Rodrigues, Green Chem. 2011, 13;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. Aparicio, R. Alcalde, Green Chem. 2009, 11, 65-78.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>Z. O. G. Schyns, M. P. Shaver, Macromol. Rapid Commun. 2021, 42, e2000415.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>I. Wojnowska-Bary&#x142;a, D. Kulikowska, K. Bernat, Sustainability 2020, 12, 2088-2100;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>L. Alaerts, M. Augustinus, K. Van Acker, Sustainability 2018, 10, 1487-1502.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Hiebel, D. Maga, S. Kabasci, A. Lieske, K. Jesse, C. Westphalen, J. Bauer, L. Kroll, R.
+                        Rinberg, T. Hartmann, H.-J. Endres, A. Siebert-Raths, D. Bellusov&#xe1;, S. K&#xf6;tter-Gribbe,
+                        A. M&#xe4;urer, T. Fell, A. D&#xf6;rgens, Fraunhofer UMSICHT, 2017.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>E. Cheung, C. Alberti, S. Bycinskij, S. Enthaler, ChemistrySelect 2021, 6, 8063-8067.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>P. Anastas, N. Eghbali, Chem. Soc. Rev. 2010, 39, 301-312.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>C. Alberti, H. R. Kricheldorf, S. Enthaler, ChemistrySelect 2020, 5, 12313-12316.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>B. Shojaei, M. Abtahi, M. Najafi, Polym. Adv. Technol. 2020, 31, 2912-2938;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. Westhues, J. Idel, J. Klankermayer, Sci. Adv. 2018, 4, eaat9669.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. E. N. De Castro, G. J. Vidotti, A. F. Rubira, E. C. Muniz, J. Appl. Polym. Sci. 2006,
+                        101, 2009-2016;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. L. F&#xe1;varo, A. R. Freitas, T. A. Ganzerli, A. G. B. Pereira, A. L. Cardozo, O.
+                        Baron, E. C. Muniz, E. M. Girotto, E. Radovanovic, J. Superctrit. Fluids 2013, 75, 138-143;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>F. Liu, J. Chen, Z. Li, P. Ni, Y. Ji, Q. Meng, J. Anal. Appl. Pyrolysis 2013, 99, 16-22;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>B. K. Kim, G. C. Hwang, S. Y. Bae, S. C. Yi, H. Kumazawa, J. Appl. Polym. Sci. 2001, 81,
+                        2102-2108.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. Mishra, A. S. Goje, Polym. Int. 2003, 52, 337-342;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>H. Kurokawa, M.-A. Ohshima, K. Sugiyama, H. Miura, Polym. Degrad. Stab 2003, 79,
+                        529-533;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>D. M. Scremin, D. Y. Miyazaki, C. E. Lunelli, S. A. Silva, S. F. Zawadzki, Macromol. Symp.
+                        2019, 383, 1800027-1800034;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>V. Sinha, M. R. Patel, J. V. Patel, J. Polym. Environ. 2008, 18, 8-25;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. L&#xf3;pez-Fonseca, I. Duque-Ingunza, B. de Rivas, S. Arnaiz, J. I. Guti&#xe9;rrez-Ortiz,
+                        Polym. Degrad. Stab. 2010, 95, 1022-1028.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>&#xa0;</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>K. Troev, G. Grancharov, R. Tsevi, I. Gitsov, J. Appl. Polym. Sci. 2003, 90, 2301-2301;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. Wang, C. Wang, H. Wang, X. Chen, S. Wang, Polym. Degrad. Stab. 2015, 114, 105-114;
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>R. Esquer, J. J. Garc&#xed;a, J. Organomet. Chem. 2019, 902, 120972.</Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. M. Payne, G. Kociok-K&#xf6;hn, E. A. C. Emanuelsson, M. D. Jones, Macromolecules 2021,
+                        54, 8453-8469.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>S. D&#x2032;Aniello, S. Lavi&#xe9;ville, F. Santulli, M. Simon, M. Sellitto, C. Tedesco,
+                        C. M. Thomas, M. Mazzeo, Catal. Sci. Technol. 2022, 12, 6142-6154.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>J. M. Payne, M. Kamran, M. G. Davidson, M. D. Jones, ChemSusChem 2022, 15, e202200255.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>M. Hofmann, J. Sundermeier, C. Alberti, S. Enthaler, ChemistrySelect 2020, 5,
+                        10010-10014.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>K. O. Siegenthaler, A. K&#xfc;nkel, G. Skupin, M. Yamamoto, in Synthetic Biodegradable
+                        Polymers, Springer, 2012.
+                    </Citation>
+                </Reference>
+                <Reference>
+                    <Citation>A. C. S&#xe1;nchez, S. R. Collinson, European Polymer Journal 2011, 47(10), 1970-1976.
+                    </Citation>
+                </Reference>
+            </ReferenceList>
+        </PubmedData>
+    </PubmedArticle>
+</PubmedArticleSet>

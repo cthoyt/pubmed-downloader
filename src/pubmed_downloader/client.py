@@ -344,13 +344,11 @@ def get_articles(  # noqa:C901
         )
     ):
         subset_x = list(clean_pubmed_ids(subset))
-        params = {"db": "pubmed", "id": ",".join(subset_x), "retmode": "xml"}
-        response = ratelimited_requests_get(EUTILS_FETCH_URL, params=params, timeout=timeout or 300)
         try:
-            tree = etree.fromstring(response.text)
-        except etree.XMLSyntaxError as e:
+            tree = _get_xml(subset_x, timeout=timeout)
+        except ValueError as e:
             if error_strategy == "raise":
-                raise ValueError(f"could not extract article from response: {response.text}") from e
+                raise
             logger.warning(
                 "error while retrieving %d PubMed IDs in batch %d: %s", len(subset_x), batch_n, e
             )
@@ -378,6 +376,18 @@ def get_articles(  # noqa:C901
                     raise ValueError(f"could not extract article from: {article_element}")
                 else:
                     raise InvalidErrorStrategyError(error_strategy)
+
+
+def _get_xml(pubmed_ids: Iterable[str], timeout: int | None = None) -> etree.ElementTree:
+    """Query the PubMed API and parse the returned XML."""
+    params = {"db": "pubmed", "id": ",".join(pubmed_ids), "retmode": "xml"}
+    response = ratelimited_requests_get(EUTILS_FETCH_URL, params=params, timeout=timeout or 300)
+    try:
+        tree = etree.fromstring(response.text)
+    except etree.XMLSyntaxError as e:
+        raise ValueError(f"could not extract article from response: {response.text}") from e
+    else:
+        return tree
 
 
 class InvalidErrorStrategyError(ValueError):
