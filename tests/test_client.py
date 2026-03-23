@@ -56,11 +56,12 @@ class TestEDirect(unittest.TestCase):
 
     def test_abstracts(self) -> None:
         """Test getting abstracts."""
-        a1, a2 = get_abstracts(["25700523", "25287859"])
+        a1, a2, a3 = get_abstracts(["25700523", "25287859", "37041114"])
         self.assertIn(
             "Here we derive mathematical conditions for the identifiability of disease", a1
         )
         self.assertIn("Extensive experimental animal studies and epidemiological obse", a2)
+        self.assertIn("[ZnCl2 (TMGeech)]", a3)
 
     def test_parse(self) -> None:
         """Test parsing."""
