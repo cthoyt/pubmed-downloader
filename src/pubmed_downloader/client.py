@@ -331,7 +331,7 @@ def get_articles(  # noqa:C901
     if batch_size is None:
         # TODO check if 200 is the maximum allowed size
         batch_size = DEFAULT_BATCH_SIZE
-    for batch_n, subset in enumerate(
+    for batch_idx, subset_it in enumerate(
         batched(
             tqdm(
                 pubmed_ids,
@@ -343,13 +343,14 @@ def get_articles(  # noqa:C901
             batch_size,
         )
     ):
+        subset = list(clean_pubmed_ids(subset_it))
         try:
-            tree = _get_xml(subset)
-        except etree.XMLSyntaxError as e:
+            tree = _get_xml(subset, timeout=timeout)
+        except ValueError as e:
             if error_strategy == "raise":
-                raise ValueError(f"could not extract article from response: {response.text}") from e
+                raise
             logger.warning(
-                "error while retrieving %d PubMed IDs in batch %d: %s", len(subset_x), batch_n, e
+                "error while retrieving %d PubMed IDs in batch %d: %s", len(subset), batch_idx, e
             )
             if error_strategy == "skip":
                 continue
@@ -379,10 +380,14 @@ def get_articles(  # noqa:C901
 
 def _get_xml(pubmed_ids: Iterable[str | int], timeout: int | None = None) -> etree.ElementTree:
     """Query the PubMed API and parse the returned XML."""
-    pubmed_ids = list(clean_pubmed_ids(pubmed_ids))
     params = {"db": "pubmed", "id": ",".join(pubmed_ids), "retmode": "xml"}
     response = ratelimited_requests_get(EUTILS_FETCH_URL, params=params, timeout=timeout or 300)
-    return etree.fromstring(response.text)
+    try:
+        tree = etree.fromstring(response.text)
+    except etree.XMLSyntaxError as e:
+        raise ValueError(f"could not extract article from response: {response.text}") from e
+    else:
+        return tree
 
 
 class InvalidErrorStrategyError(ValueError):
