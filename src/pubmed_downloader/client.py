@@ -331,7 +331,7 @@ def get_articles(  # noqa:C901
     if batch_size is None:
         # TODO check if 200 is the maximum allowed size
         batch_size = DEFAULT_BATCH_SIZE
-    for batch_idx, subset_it in enumerate(
+    for batch_n, subset in enumerate(
         batched(
             tqdm(
                 pubmed_ids,
@@ -343,14 +343,14 @@ def get_articles(  # noqa:C901
             batch_size,
         )
     ):
-        subset = list(clean_pubmed_ids(subset_it))
+        subset_x = list(clean_pubmed_ids(subset))
         try:
-            tree = _get_xml(subset, timeout=timeout)
+            tree = _get_xml(subset_x, timeout=timeout)
         except ValueError as e:
             if error_strategy == "raise":
                 raise
             logger.warning(
-                "error while retrieving %d PubMed IDs in batch %d: %s", len(subset), batch_idx, e
+                "error while retrieving %d PubMed IDs in batch %d: %s", len(subset_x), batch_n, e
             )
             if error_strategy == "skip":
                 continue
