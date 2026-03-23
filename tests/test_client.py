@@ -18,6 +18,7 @@ from pubmed_downloader.client import (
 
 HERE = Path(__file__).parent.resolve()
 SAMPLE_PATH = HERE.joinpath("sample.xml")
+SAMPLE_2_PATH = HERE.joinpath("pubmed_37041114.xml")
 
 
 class TestEDirect(unittest.TestCase):
@@ -56,12 +57,20 @@ class TestEDirect(unittest.TestCase):
 
     def test_abstracts(self) -> None:
         """Test getting abstracts."""
-        a1, a2, a3 = get_abstracts(["25700523", "25287859", "37041114"])
+        a1, a2 = get_abstracts(["25700523", "25287859"])
         self.assertIn(
             "Here we derive mathematical conditions for the identifiability of disease", a1
         )
         self.assertIn("Extensive experimental animal studies and epidemiological obse", a2)
-        self.assertIn("[ZnCl2 (TMGeech)]", a3)
+
+    def test_abstract_with_weird_characters(self) -> None:
+        """Test getting abstracts."""
+        root = etree.parse(SAMPLE_2_PATH)
+        article_element = root.find("PubmedArticle")
+        article = _extract_article(
+            article_element, ror_grounder=None, mesh_grounder=None, author_grounder=None
+        )
+        self.assertIn("[ZnCl2 (TMGeech)]", article.get_abstract())
 
     def test_parse(self) -> None:
         """Test parsing."""

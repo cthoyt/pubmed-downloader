@@ -340,10 +340,11 @@ def _extract_article(  # noqa:C901
 
     abstract_texts = []
     for abstract_text_tag in medline_citation.findall(".//Abstract/AbstractText"):
-        if not abstract_text_tag.text:
+        text = "".join(abstract_text_tag.itertext())
+        if not text:
             continue
         abstract_text = AbstractText(
-            text=abstract_text_tag.text,
+            text=text,
             label=abstract_text_tag.attrib.get("Label"),
             category=abstract_text_tag.attrib.get("NlmCategory"),
         )
