@@ -378,7 +378,7 @@ def get_articles(  # noqa:C901
                     raise InvalidErrorStrategyError(error_strategy)
 
 
-def _get_xml(pubmed_ids: Iterable[str | int], timeout: int | None = None) -> etree.ElementTree:
+def _get_xml(pubmed_ids: Iterable[str], timeout: int | None = None) -> etree.ElementTree:
     """Query the PubMed API and parse the returned XML."""
     params = {"db": "pubmed", "id": ",".join(pubmed_ids), "retmode": "xml"}
     response = ratelimited_requests_get(EUTILS_FETCH_URL, params=params, timeout=timeout or 300)

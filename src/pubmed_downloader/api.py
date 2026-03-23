@@ -291,12 +291,13 @@ def _extract_article(  # noqa:C901
     title_tag = article.find("ArticleTitle")
     if title_tag is None:
         raise ValueError(f"[pubmed:{pubmed}] is missing an ArticleTitle tag")
-    title = title_tag.text
+
+    title = "".join(title_tag.itertext())
     if title is None:
         logger.debug(
             "[pubmed:%s] has an empty ArticleTitle tag:%s",
             pubmed,
-            etree.tostring(element, pretty_print=True, encoding="unicode"),
+            etree.tostring(title_tag, encoding="unicode"),
         )
         return None
 
