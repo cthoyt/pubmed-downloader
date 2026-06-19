@@ -1,0 +1,17 @@
+--------------------------------------------------------------------------------
+JrId: 1
+JournalTitle: AADE editors' journal
+MedAbbr: AADE Ed J
+ISSN (Print): 0160-6638
+ISSN (Online):
+IsoAbbr: AADE Ed J
+NlmId: 7708172
+--------------------------------------------------------------------------------
+JrId: 2
+JournalTitle: Nature
+MedAbbr: Nature
+ISSN (Print): 0028-0836
+ISSN (Online): 1476-4687
+IsoAbbr: Nature
+NlmId: 0410462
+--------------------------------------------------------------------------------
