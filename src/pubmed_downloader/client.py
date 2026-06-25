@@ -135,7 +135,7 @@ def _ensure_xtract_command(url: str) -> Path:
 
     # make sure that the file is executable
     st = os.stat(path)
-    os.chmod(path, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    os.chmod(path, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)  # noqa:S103
     return path
 
 
