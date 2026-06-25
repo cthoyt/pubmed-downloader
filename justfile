@@ -16,7 +16,7 @@ coverage-report:
 
 [doc("run `coverage` with a given subcommand")]
 @coverage command:
-    uvx --from coverage[toml] coverage {{command}}
+    uvx --from coverage[toml] coverage {{ command }}
 
 # Note that the package name is required for discovery
 [doc("test that documentation examples run properly")]
@@ -97,7 +97,7 @@ docs-test:
 
 [doc("run `bumpversion` with a given subcommand")]
 @bumpversion command:
-    uvx bump-my-version bump {{command}}
+    uvx bump-my-version bump {{ command }}
 
 [doc("make a release")]
 bumpversion-release:
