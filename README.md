@@ -84,7 +84,7 @@ $ python3 -m pip install git+https://github.com/cthoyt/pubmed-downloader.git
 
 Contributions, whether filing an issue, making a pull request, or forking, are
 appreciated. See
-[CONTRIBUTING.md](https://github.com/cthoyt/pubmed-downloader/blob/master/.github/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/cthoyt/pubmed-downloader/blob/main/.github/CONTRIBUTING.md)
 for more information on getting involved.
 
 ## 👋 Attribution
@@ -149,6 +149,22 @@ Alternatively, install using pip:
 
 ```console
 $ python3 -m pip install -e .
+```
+
+### Pre-commit
+
+You can optionally use [pre-commit](https://pre-commit.com) to automate running
+key code quality checks on each commit. Enable it with:
+
+```console
+$ uvx pre-commit install
+```
+
+Or using `pip`:
+
+```console
+$ pip install pre-commit
+$ pre-commit install
 ```
 
 ### 🥼 Testing
@@ -277,7 +293,7 @@ $ tox -e finish
 This script does the following:
 
 1. Uses [bump-my-version](https://github.com/callowayproject/bump-my-version) to
-   switch the version number in the `pyproject.toml`, `CITATION.cff`,
+   switch the version number in the `pyproject.toml`,
    `src/pubmed_downloader/version.py`, and
    [`docs/source/conf.py`](docs/source/conf.py) to not have the `-dev` suffix
 2. Packages the code in both a tar archive and a wheel using
