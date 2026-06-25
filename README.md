@@ -59,13 +59,13 @@ The most recent release can be installed from
 [PyPI](https://pypi.org/project/pubmed_downloader/) with uv:
 
 ```console
-$ uv pip install pubmed_downloader
+$ uv pip install pubmed-downloader
 ```
 
 or with pip:
 
 ```console
-$ python3 -m pip install pubmed_downloader
+$ python3 -m pip install pubmed-downloader
 ```
 
 The most recent code and data can be installed directly from GitHub with uv:
