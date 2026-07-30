@@ -126,7 +126,8 @@ release = [
 [project.optional-dependencies]
 process = [
     "pyobo",
-    "orcid-downloader",
+    "ror-downloader>=0.0.5",
+    "orcid-downloader>=0.2.0",
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
@@ -220,6 +221,7 @@ extend-select = [
 ]
 ignore = [
     "D105", # Missing docstring in magic method
+    "DTZ011",
 ]
 
 # See https://docs.astral.sh/ruff/settings/#per-file-ignores

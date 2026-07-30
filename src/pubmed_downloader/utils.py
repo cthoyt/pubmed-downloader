@@ -81,8 +81,8 @@ def _get_day(date_tag: Element, year: int, month: int) -> int:
         return 1
     day = int(day_tag.text)
     _start, n_days = monthrange(year, month)
-    if day > n_days:  # sometimes there are issues where date is out of range
-        day = n_days
+    # sometimes there are issues where date is out of range
+    day = min(day, n_days)
     return day
 
 
