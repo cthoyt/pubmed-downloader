@@ -192,8 +192,7 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
     retmax = kwargs.pop("retmax", 10_000)
     if retmax <= 0:
         raise ValueError
-    if retmax > 10_000:
-        retmax = 10_000
+    retmax = min(retmax, 10_000)
 
     retstart = kwargs.pop("retstart", 0)
     if retstart < 0:
