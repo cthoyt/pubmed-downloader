@@ -8,10 +8,10 @@ IsoAbbr: AADE Ed J
 NlmId: 7708172
 --------------------------------------------------------------------------------
 JrId: 2
-JournalTitle: Nature
-MedAbbr: Nature
-ISSN (Print): 0028-0836
-ISSN (Online): 1476-4687
-IsoAbbr: Nature
-NlmId: 0410462
+JournalTitle: AANA journal
+MedAbbr: AANA J
+ISSN (Print): 0094-6354
+ISSN (Online): 2162-5239
+IsoAbbr: AANA J (ISO)
+NlmId: 0431420
 --------------------------------------------------------------------------------
