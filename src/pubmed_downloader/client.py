@@ -135,7 +135,7 @@ def _ensure_xtract_command(url: str) -> Path:
 
     # make sure that the file is executable
     st = os.stat(path)
-    os.chmod(path, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    os.chmod(path, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)  # noqa:S103
     return path
 
 
@@ -192,8 +192,7 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
     retmax = kwargs.pop("retmax", 10_000)
     if retmax <= 0:
         raise ValueError
-    if retmax > 10_000:
-        retmax = 10_000
+    retmax = min(retmax, 10_000)
 
     retstart = kwargs.pop("retstart", 0)
     if retstart < 0:

@@ -1,5 +1,4 @@
 Usage
 =====
 
-.. automodule:: pubmed_downloader.api
-    :members:
+.. automodapi:: pubmed_downloader.api

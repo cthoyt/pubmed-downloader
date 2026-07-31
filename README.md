@@ -22,8 +22,8 @@
     <a href="https://github.com/cthoyt/pubmed-downloader/blob/main/.github/CODE_OF_CONDUCT.md">
         <img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg" alt="Contributor Covenant"/></a>
     <!-- uncomment if you archive on zenodo
-    <a href="https://zenodo.org/badge/latestdoi/XXXXXX">
-        <img src="https://zenodo.org/badge/XXXXXX.svg" alt="DOI"></a>
+    <a href="https://doi.org/10.5281/zenodo.XXXXXX">
+        <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXX.svg" alt="DOI"></a>
     -->
 </p>
 
@@ -59,13 +59,13 @@ The most recent release can be installed from
 [PyPI](https://pypi.org/project/pubmed_downloader/) with uv:
 
 ```console
-$ uv pip install pubmed_downloader
+$ uv pip install pubmed-downloader
 ```
 
 or with pip:
 
 ```console
-$ python3 -m pip install pubmed_downloader
+$ python3 -m pip install pubmed-downloader
 ```
 
 The most recent code and data can be installed directly from GitHub with uv:
@@ -84,7 +84,7 @@ $ python3 -m pip install git+https://github.com/cthoyt/pubmed-downloader.git
 
 Contributions, whether filing an issue, making a pull request, or forking, are
 appreciated. See
-[CONTRIBUTING.md](https://github.com/cthoyt/pubmed-downloader/blob/master/.github/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/cthoyt/pubmed-downloader/blob/main/.github/CONTRIBUTING.md)
 for more information on getting involved.
 
 ## 👋 Attribution
@@ -149,6 +149,22 @@ Alternatively, install using pip:
 
 ```console
 $ python3 -m pip install -e .
+```
+
+### Pre-commit
+
+You can optionally use [pre-commit](https://pre-commit.com) to automate running
+key code quality checks on each commit. Enable it with:
+
+```console
+$ uvx pre-commit install
+```
+
+Or using `pip`:
+
+```console
+$ pip install pre-commit
+$ pre-commit install
 ```
 
 ### 🥼 Testing
@@ -277,7 +293,7 @@ $ tox -e finish
 This script does the following:
 
 1. Uses [bump-my-version](https://github.com/callowayproject/bump-my-version) to
-   switch the version number in the `pyproject.toml`, `CITATION.cff`,
+   switch the version number in the `pyproject.toml`,
    `src/pubmed_downloader/version.py`, and
    [`docs/source/conf.py`](docs/source/conf.py) to not have the `-dev` suffix
 2. Packages the code in both a tar archive and a wheel using

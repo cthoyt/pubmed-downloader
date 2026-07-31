@@ -197,14 +197,12 @@ def _process_journal(element: Element) -> Journal | None:
         case _ as v:
             raise ValueError(f"unknown activity value: {v}")
     synonyms = [alias_tag.text for alias_tag in element.findall("Alias")]
-    if start_year := element.findtext("StartYear"):
-        if len(start_year) != 4:
-            tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
-            start_year = None
-    if end_year := element.findtext("EndYear"):
-        if len(end_year) != 4:
-            tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
-            end_year = None
+    if (start_year := element.findtext("StartYear")) and len(start_year) != 4:
+        tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
+        start_year = None
+    if (end_year := element.findtext("EndYear")) and len(end_year) != 4:
+        tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
+        end_year = None
 
     # TODO abbreviations?
     return Journal(
@@ -658,7 +656,7 @@ def _parse_catalog(
     author_grounder: ssslm.Grounder,
 ) -> Iterable[CatalogRecord]:
     cache_path = path.with_suffix(".json.gz")
-    if cache_path.is_file() and not force_process and False:
+    if cache_path.is_file() and not force_process:
         yield from _read_catalog(cache_path)
     else:
         try:

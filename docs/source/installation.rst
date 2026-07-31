@@ -2,17 +2,17 @@ Installation
 ============
 
 The most recent release can be installed from `PyPI
-<https://pypi.org/project/pubmed_downloader>`_ with uv:
+<https://pypi.org/project/pubmed-downloader>`_ with uv:
 
 .. code-block:: console
 
-    $ uv pip install pubmed_downloader
+    $ uv pip install pubmed-downloader
 
 or with pip:
 
 .. code-block:: console
 
-    $ python3 -m pip install pubmed_downloader
+    $ python3 -m pip install pubmed-downloader
 
 Installing from git
 -------------------

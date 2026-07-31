@@ -20,7 +20,6 @@ classifiers = [
     "Development Status :: 1 - Planning",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Framework :: Pytest",
     "Framework :: tox",
@@ -31,6 +30,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Typing :: Typed",
     # TODO add your topics from the Trove controlled vocabulary (see https://pypi.org/classifiers)
@@ -45,6 +45,7 @@ keywords = [
 
 # License Information.
 # See PEP-639 at https://peps.python.org/pep-0639/#add-license-files-key
+license = "MIT"
 license-files = [
     "LICENSE",
 ]
@@ -125,7 +126,8 @@ release = [
 [project.optional-dependencies]
 process = [
     "pyobo",
-    "orcid-downloader",
+    "ror-downloader>=0.0.5",
+    "orcid-downloader>=0.2.0",
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
@@ -138,7 +140,7 @@ Documentation = "https://pubmed_downloader.readthedocs.io"
 Funding = "https://github.com/sponsors/cthoyt"
 
 [project.scripts]
-pubmed_downloader = "pubmed_downloader.cli:main"
+pubmed-downloader = "pubmed_downloader.cli:main"
 
 [tool.cruft]
 skip = [
@@ -219,7 +221,7 @@ extend-select = [
 ]
 ignore = [
     "D105", # Missing docstring in magic method
-    "E203", # Black conflicts with the following
+    "DTZ011",
 ]
 
 # See https://docs.astral.sh/ruff/settings/#per-file-ignores
@@ -282,8 +284,3 @@ replace = "release = \"{new_version}\""
 filename = "src/pubmed_downloader/version.py"
 search = "VERSION = \"{current_version}\""
 replace = "VERSION = \"{new_version}\""
-
-[[tool.bumpversion.files]]
-filename = "CITATION.cff"
-search = "version: {current_version}"
-replace = "version: {new_version}"
