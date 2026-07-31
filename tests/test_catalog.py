@@ -26,7 +26,9 @@ class TestCatalog(unittest.TestCase):
 
         Regression test: this test previously failed because the code never sets start_year and
         end_year for catalog.Journal() dataclass entries, where None values are allowed but no
-        default values are provided. None of the entries in either file includes start and end years.
+        default values are provided. None of the entries in either file includes start and end
+        years. Note that the similar function for handling XML journal entries, _process_journal(),
+        explicitly sets start_year and end_year to None if it is not included.
 
         PR https://github.com/cthoyt/pubmed-downloader/pull/16 adds a default `None` value for both
         fields so that validation passes.
