@@ -24,10 +24,12 @@ class TestCatalog(unittest.TestCase):
         ensures that a short example file (a test fixture at tests/journal_overview_sample.txt) can
         be parsed without throwing an error.
 
-        Regression test: this test previously failed because the catalog.Journal() dataclass
-        required both a start_year and end_year, but neither is included for any entries in either
-        file. PR https://github.com/cthoyt/pubmed-downloader/pull/16 changes these fields to
-        optional so that validation passes.
+        Regression test: this test previously failed because the code never sets start_year and
+        end_year for catalog.Journal() dataclass entries, where None values are allowed but no
+        default values are provided. None of the entries in either file includes start and end years.
+
+        PR https://github.com/cthoyt/pubmed-downloader/pull/16 adds a default `None` value for both
+        fields so that validation passes.
         """
         journals = list(_parse_journals(JOURNAL_OVERVIEW_PATH))
 
