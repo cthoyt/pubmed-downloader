@@ -9,7 +9,7 @@ import itertools as itt
 import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Literal, TextIO
+from typing import Any, Literal, TextIO, cast
 from xml.etree.ElementTree import Element
 
 import click
@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup
 from curies import Reference
 from lxml import etree
 from pydantic import BaseModel, Field
+from ssslm import Grounder
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 
@@ -623,9 +624,9 @@ def iterate_process_catalog(
     import pyobo
     from orcid_downloader.lexical import get_orcid_grounder
 
-    ror_grounder = pyobo.get_grounder("ror")
-    mesh_grounder = pyobo.get_grounder("mesh")
-    author_grounder = get_orcid_grounder()
+    ror_grounder = cast(Grounder, pyobo.get_grounder("ror"))
+    mesh_grounder = cast(Grounder, pyobo.get_grounder("mesh"))
+    author_grounder: Grounder = get_orcid_grounder()
 
     for path in tqdm(ensure_serfile_catalog(force=force), desc="Processing NLM Catalog"):
         yield from _parse_catalog(

@@ -202,7 +202,7 @@ def parse_author(  # noqa:C901
     initials_tag = tag.find("Initials")
     collective_name_tag = tag.find("CollectiveName")
 
-    roles = [role_tag.text for role_tag in tag.findall("Role")]
+    roles = [role_tag.text for role_tag in tag.findall("Role") if role_tag.text is not None]
 
     if collective_name_tag is not None and collective_name_tag.text:
         name = collective_name_tag.text.rstrip(".")
@@ -279,7 +279,7 @@ class Qualifier(BaseModel):
 
 
 class Heading(BaseModel):
-    """Represents a MeSH heading annnotation."""
+    """Represents a MeSH heading annotation."""
 
     name: str
     mesh_id: str
@@ -324,6 +324,8 @@ def parse_mesh_heading(
     qualifiers = []
     # FIXME is this supposed to look in tag or descriptor_name_tag
     for qualifier_tag in mesh_heading_tag.findall("QualifierName"):
+        if qualifier_tag.text is None:
+            continue
         qualifier_mesh_id = qualifier_tag.attrib.get("UI")
         qualifiers.append(
             Qualifier(
@@ -366,7 +368,7 @@ def _parse_yn(s: str) -> bool:
             raise ValueError(s)
 
 
-SPLOOSHED_RE = re.compile(r"^\d{15}(\d|X)$")
+SPLOOSHED_RE = re.compile(r"^\d{15}([\dX])$")
 
 
 def _clean_orcid(s: str) -> str | None:

@@ -26,14 +26,12 @@ classifiers = [
     "Framework :: Sphinx",
     "Natural Language :: English",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Typing :: Typed",
-    # TODO add your topics from the Trove controlled vocabulary (see https://pypi.org/classifiers)
 ]
 keywords = [
     "snekpack", # please keep this keyword to credit the cookiecutter-snekpack template
@@ -50,19 +48,19 @@ license-files = [
     "LICENSE",
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "tqdm", # progress bars
     "click",
     "more-click>=0.1.3",
     "requests",
     "beautifulsoup4",
-    "pystow",
+    "pystow>=0.9.0",
     "pydantic",
     "pydantic_extra_types",
     "lxml",
-    "curies>=0.10.6",
-    "ssslm>=0.0.12",
+    "curies>=0.15.0",
+    "ssslm>=0.2.2",
     "typing-extensions",
     "more-itertools",
     "ratelimit",
@@ -125,9 +123,9 @@ release = [
 # see https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#dependencies-optional-dependencies
 [project.optional-dependencies]
 process = [
-    "pyobo",
+    "pyobo>=0.13.4",
     "ror-downloader>=0.0.5",
-    "orcid-downloader>=0.2.0",
+    "orcid-downloader>=0.3.0",
 ]
 
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
