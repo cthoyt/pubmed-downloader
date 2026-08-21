@@ -8,7 +8,7 @@ import stat
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Literal, TypeAlias, TypedDict, overload
+from typing import Any, Literal, NotRequired, TypeAlias, TypedDict, overload
 
 import pystow
 import requests
@@ -18,7 +18,7 @@ from more_itertools import batched
 from pydantic import BaseModel
 from ratelimit import limits, sleep_and_retry
 from tqdm import tqdm
-from typing_extensions import NotRequired, Unpack
+from typing_extensions import Unpack
 
 from .api import Article, _extract_article
 from .utils import clean_pubmed_ids
