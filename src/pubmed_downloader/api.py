@@ -14,7 +14,7 @@ import typing
 from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import Any, Literal, TextIO, TypeAlias
+from typing import Any, Literal, TextIO, TypeAlias, cast
 from xml.etree.ElementTree import Element
 
 import click
@@ -28,6 +28,7 @@ from lxml import etree
 from more_click import verbose_option
 from pydantic import BaseModel, Field
 from pystow.utils import safe_open_writer
+from ssslm import Grounder
 from tqdm import tqdm
 from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map
@@ -606,8 +607,8 @@ def _ensure_grounders(
         import pyobo
 
         logger.info("getting ROR grounder")
-        ror_grounder = pyobo.get_grounder("ror")
-        if not ror_grounder.not_empty():
+        ror_grounder = cast(Grounder, pyobo.get_grounder("ror"))
+        if ror_grounder.empty():
             raise ValueError("ROR grounder was empty")
         logger.info("done getting ROR grounder")
 
@@ -615,8 +616,8 @@ def _ensure_grounders(
         import pyobo
 
         logger.info("getting MeSH grounder")
-        mesh_grounder = pyobo.get_grounder("mesh")
-        if not mesh_grounder.not_empty():
+        mesh_grounder = cast(Grounder, pyobo.get_grounder("mesh"))
+        if mesh_grounder.empty():
             raise ValueError("MeSH grounder was empty")
         logger.info("done getting MeSH grounder")
 
@@ -625,7 +626,7 @@ def _ensure_grounders(
 
         logger.info("getting ORCiD grounder")
         author_grounder = get_orcid_grounder()
-        if not author_grounder.not_empty():
+        if author_grounder.empty():
             raise ValueError("ORCiD grounder was empty")
         logger.info("done getting ORCiD grounder")
 
