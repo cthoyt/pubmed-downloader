@@ -6,7 +6,7 @@ import datetime
 import itertools as itt
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Annotated, Any, Literal, cast, overload
+from typing import Annotated, Any, Literal, TypeAlias, cast, overload
 from xml.etree.ElementTree import Element
 
 import click
@@ -16,7 +16,8 @@ from bs4 import BeautifulSoup
 from curies import NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
-from pystow.utils import read_pydantic_json_list, write_pydantic_json_list
+from pydantic_extra_types.language_code import ISO639_3
+from pystow.utils import iter_pydantic_jsonl, read_pydantic_jsonl, write_pydantic_jsonl
 from ssslm import Grounder
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
@@ -54,7 +55,7 @@ J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
 # The same content as J_Medline.txt plus NCBI molecular biology database journals
 J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 
-CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
+CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.jsonl.gz")
 
 
 class OverviewRecord(BaseModel):
@@ -247,10 +248,22 @@ class Resource(BaseModel):
     carrier_type: str
 
 
+ResourceType: TypeAlias = Literal[
+    "Serial",
+    "Nonmusical Sound Recording",
+    "Visual Material",
+    "Electronic Resource",
+    "Kit",
+    "Book",
+    "Map",
+    "Still Image",
+]
+
+
 class ResourceInfo(BaseModel):
     """Represents a resource info annotation to a catalog record."""
 
-    type: str
+    type: ResourceType
     issuance: Literal["continuing"]
     resource_units: list[str]
     resource: Resource | None = None
@@ -259,7 +272,7 @@ class ResourceInfo(BaseModel):
 class Imprint(BaseModel):
     """Represents an imprint, which is like a brand for a publisher."""
 
-    type: str | None = None
+    type: Literal["Original", "Current"] | None = None
     function_type: str | None = None
     place: str | None = None
     entity: str | None = None
@@ -268,8 +281,7 @@ class Imprint(BaseModel):
 class Language(BaseModel):
     """Represents a language and its usage annotation."""
 
-    # TODO is this supposed to be standardized with ISO 3-letter?
-    value: str
+    value: ISO639_3
 
     # this doesn't really make sense
     type: Literal["Primary", "Summary", "TableOfContents", "Original", "Captions"]
@@ -300,6 +312,8 @@ class CatalogRecord(BaseModel):
     """Represents a record in the NLM Catalog."""
 
     nlm_catalog_id: str
+    owner: str
+    status: str
     title: str
     title_sort: Literal["N"] | int
     medline_short_title: str | None = None
@@ -395,10 +409,19 @@ def _extract_title_related(tag: Element) -> TitleRelated | None:
         ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
         for issn_tag in tag.findall("ISSN")
     ]
-    xrefs = [
-        Reference(prefix=record_id_tag.attrib["Source"], identifier=record_id_tag.text)
-        for record_id_tag in tag.findall("RecordID")
-    ]
+    xrefs = []
+    for record_id_tag in tag.findall("RecordID"):
+        if record_id_tag.text is None:
+            continue
+        prefix = record_id_tag.attrib["Source"]
+        try:
+            # look into LC and sn 97039260
+            xref = Reference(prefix=prefix, identifier=record_id_tag.text.replace(" ", ""))
+        except ValueError:
+            tqdm.write(f"failed to extract xref from {prefix} and {record_id_tag.text}")
+        else:
+            xrefs.append(xref)
+
     return TitleRelated(
         text=inner_tag.text,
         source=title_source,
@@ -436,6 +459,9 @@ def _extract_catalog_record(  # noqa:C901
 
     alts = _extract_alts(tag)
     rels = _extract_rels(tag)
+
+    owner = tag.attrib["Owner"]
+    status = tag.attrib["Status"]
 
     # TODO PhysicalDescription
 
@@ -534,6 +560,8 @@ def _extract_catalog_record(  # noqa:C901
 
     return CatalogRecord(
         nlm_catalog_id=nlm_catalog_id,
+        owner=owner,
+        status=status,
         title=title.rstrip("."),
         title_sort=title_sort,
         title_alternatives=alts,
@@ -637,18 +665,22 @@ def _replace(x: str | None, d: Mapping[str | None, str]) -> str | None:
 
 
 def _process_other_id(tag: Element) -> Reference | None:
-    prefix = tag.attrib["Prefix"].lstrip("(").rstrip(")")
-    # attrib also has 'Source',
+    prefix = tag.attrib.get("Prefix")
     identifier = tag.text
+    if prefix is None or identifier is None:
+        return None
+    prefix = prefix.strip().lstrip("(").rstrip(")").strip()
+    identifier = identifier.strip()
+    # TODO attrib also has 'Source',
     return Reference(prefix=prefix, identifier=identifier)
 
 
 def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
     if CATALOG_PROCESSED_GZ_PATH.is_file() and not force_process:
-        return read_pydantic_json_list(CATALOG_PROCESSED_GZ_PATH, CatalogRecord)
+        return read_pydantic_jsonl(CATALOG_PROCESSED_GZ_PATH, CatalogRecord)
     catalog_records = list(iterate_process_catalog(force=force, force_process=force_process))
-    write_pydantic_json_list(catalog_records, CATALOG_PROCESSED_GZ_PATH)
+    write_pydantic_jsonl(catalog_records, CATALOG_PROCESSED_GZ_PATH)
     return catalog_records
 
 
@@ -691,9 +723,9 @@ def _parse_catalog(
     mesh_grounder: ssslm.Grounder,
     author_grounder: ssslm.Grounder,
 ) -> Iterable[CatalogRecord]:
-    cache_path = path.with_suffix(".json.gz")
+    cache_path = path.with_suffix(".jsonl.gz")
     if cache_path.is_file() and not force_process:
-        yield from read_pydantic_json_list(cache_path, CatalogRecord)
+        yield from iter_pydantic_jsonl(cache_path, CatalogRecord)
     else:
         try:
             tree = etree.parse(path)
@@ -711,7 +743,7 @@ def _parse_catalog(
             if catalog_record:
                 catalog_records.append(catalog_record)
 
-        write_pydantic_json_list(catalog_records, cache_path)
+        write_pydantic_jsonl(catalog_records, cache_path)
         yield from catalog_records
 
 
