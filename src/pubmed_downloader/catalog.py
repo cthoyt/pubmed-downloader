@@ -37,7 +37,11 @@ from .utils import (
 __all__ = [
     "CatalogRecord",
     "Journal",
+    "ensure_catalog_provider_links",
     "ensure_catfile_catalog",
+    "ensure_j_entrez",
+    "ensure_j_medline",
+    "ensure_journal_overview",
     "ensure_serfile_catalog",
     "get_catalog_to_publisher",
     "get_journals",
