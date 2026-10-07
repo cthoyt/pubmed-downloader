@@ -75,23 +75,18 @@ def ensure_j_entrez(*, force: bool = False) -> Path:
     return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
 
 
-class BaseJournal(BaseModel):
+class JournalShort(BaseModel):
     """Represents records in the J_Entrez and J_medline files."""
 
     id: int
     nlm_catalog_id: str
     title: str
     issns: list[ISSN] = Field(default_factory=list)
-
-
-class JournalShort(BaseJournal):
-    """Represents records in the J_Entrez and J_Medline files."""
-
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
 
 
-class Journal(BaseJournal):
+class Journal(JournalShort):
     """Represents a journal (a subset of NLM Catalog Records)."""
 
     synonyms: list[str] = Field(default_factory=list)
