@@ -85,6 +85,11 @@ class JournalShort(BaseModel):
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
 
+    @property
+    def nlm_catalog_url(self) -> str:
+        """Get the NLM Catalog URL."""
+        return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
+
 
 class Journal(JournalShort):
     """Represents a journal (a subset of NLM Catalog Records)."""
@@ -94,11 +99,6 @@ class Journal(JournalShort):
     start_year: int | None = None
     end_year: int | None = None
     publisher: NamedReference | None = None
-
-    @property
-    def nlm_catalog_url(self) -> str:
-        """Get the NLM Catalog URL."""
-        return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
 
 
 #: A remapping from internal journal keys to :class:`Journal` field names
@@ -215,7 +215,9 @@ def _iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable
 
 
 def _process_journal(
-    element: Element, xx: dict[str, JournalShort], catalog_to_publisher: dict[str, NamedReference]
+    element: Element,
+    journal_short_info: dict[str, JournalShort],
+    catalog_to_publisher: dict[str, NamedReference],
 ) -> Journal | None:
     jrid = element.attrib["jrid"]
 
@@ -223,7 +225,7 @@ def _process_journal(
     if nlm_catalog_id is None:
         raise ValueError("no NLM catalog ID")
 
-    extra_info = xx.get(nlm_catalog_id)
+    extra_info = journal_short_info.get(nlm_catalog_id)
 
     title = element.findtext("Name")
     issns = [
@@ -782,7 +784,9 @@ def iterate_process_catalog(
     author_grounder: Grounder = get_orcid_grounder()
 
     for path in tqdm(
-        ensure_serfile_catalog(refresh_index=refresh_index), desc="Processing NLM Catalog"
+        ensure_serfile_catalog(refresh_index=refresh_index),
+        desc="Processing NLM Catalog",
+        unit="file",
     ):
         yield from _parse_catalog(
             path,
@@ -916,7 +920,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:
     from tabulate import tabulate
 
     publication_type_counter: Counter[str] = Counter()
-    imprint_type_counter: Counter[str | None] = Counter()
+    imprint_type_counter: Counter[str] = Counter()
     language_counter: Counter[str] = Counter()
     language_type_counter: Counter[str] = Counter()
     type_counter: Counter[str] = Counter()
@@ -938,7 +942,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             publication_type_counter[pt] += 1
 
         for imprint in record.imprints:
-            imprint_type_counter[imprint.type] += 1
+            imprint_type_counter[imprint.type or "none"] += 1
 
         for lang in record.languages:
             language_counter[lang.value] += 1
@@ -955,41 +959,23 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             media_type_counter[resource_info.resource.media_type] += 1
             carrier_type_counter[resource_info.resource.carrier_type] += 1
 
-    click.secho("\nPublication Status Counter", fg="blue")
-    click.echo(tabulate(status_counter.most_common()))
+    def _tabulate(counter: Counter[str], title: str) -> None:
+        click.echo(
+            "\n" + tabulate(counter.most_common(), headers=[title, "Count"], tablefmt="github")
+        )
 
-    click.secho("\nPublication Owner Counter", fg="blue")
-    click.echo(tabulate(owner_counter.most_common()))
-
-    click.secho("\nPublication Type Counter", fg="blue")
-    click.echo(tabulate(publication_type_counter.most_common()))
-
-    click.secho("\nImprint Type Counter", fg="blue")
-    click.echo(tabulate(imprint_type_counter.most_common()))
-
-    click.secho("\nLanguage Counter", fg="blue")
-    click.echo(tabulate(language_counter.most_common()))
-
-    click.secho("\nLanguage Type Counter", fg="blue")
-    click.echo(tabulate(language_type_counter.most_common()))
-
-    click.secho("\nResource Type Counter", fg="blue")
-    click.echo(tabulate(type_counter.most_common()))
-
-    click.secho("\nResource Issuance Counter", fg="blue")
-    click.echo(tabulate(issuance_counter.most_common()))
-
-    click.secho("\nResource Unit Counter", fg="blue")
-    click.echo(tabulate(resource_unit_counter.most_common()))
-
-    click.secho("\nContent Type Counter", fg="blue")
-    click.echo(tabulate(content_type_counter.most_common()))
-
-    click.secho("\nMedia Type Counter", fg="blue")
-    click.echo(tabulate(media_type_counter.most_common()))
-
-    click.secho("\nCarrier Type Counter", fg="blue")
-    click.echo(tabulate(carrier_type_counter.most_common()))
+    _tabulate(status_counter, "Publication Status")
+    _tabulate(owner_counter, "Publication Owner")
+    _tabulate(publication_type_counter, "Publication Type")
+    _tabulate(imprint_type_counter, "Imprint Type")
+    _tabulate(language_counter, "Language")
+    _tabulate(language_type_counter, "Language Type")
+    _tabulate(type_counter, "Resource Type")
+    _tabulate(issuance_counter, "Resource Issuance")
+    _tabulate(resource_unit_counter, "Resource Unit")
+    _tabulate(content_type_counter, "Content Type")
+    _tabulate(media_type_counter, "Media Type")
+    _tabulate(carrier_type_counter, "Carrier Type")
 
 
 if __name__ == "__main__":
