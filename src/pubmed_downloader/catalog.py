@@ -58,6 +58,16 @@ J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.jsonl.gz")
 
 
+def ensure_j_medline(*, force: bool = False) -> Path:
+    """Ensure the overview file for PubMed/MEDLINE journals is downloaded."""
+    return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
+
+
+def ensure_j_entrez(*, force: bool = False) -> Path:
+    """Ensure the overview file for PubMed/MEDLINE extended with NCBI molecular biology database journals is downloaded."""  # noqa:E501
+    return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
+
+
 class OverviewRecord(BaseModel):
     """Represents records in the J_Entrez and J_medline files."""
 
@@ -66,7 +76,7 @@ class OverviewRecord(BaseModel):
     title: str
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
-    issns: list[ISSN] | None = None
+    issns: list[ISSN] = Field(default_factory=list)
 
 
 class Journal(BaseModel):
@@ -83,8 +93,8 @@ class Journal(BaseModel):
     aliases: list[str] | None = None
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
-    issns: list[ISSN] | None = None
-    synonyms: list[str] | None = None
+    issns: list[ISSN] = Field(default_factory=list)
+    synonyms: list[str] = Field(default_factory=list)
     active: bool = True
     start_year: int | None = None
     end_year: int | None = None
@@ -115,17 +125,7 @@ def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]
     return list(iterate_journals(force=force, progress=progress))
 
 
-def ensure_j_medline(*, force: bool = False) -> Path:
-    """Ensure the overview file for PubMed/MEDLINE journals is downloaded."""
-    return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
-
-
-def ensure_j_entrez(*, force: bool = False) -> Path:
-    """Ensure the overview file for PubMed/MEDLINE extended with NCBI molecular biology database journals is downloaded."""  # noqa:E501
-    return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
-
-
-def _parse_overview(path: Path) -> Iterable[OverviewRecord]:
+def _parse_journals(path: Path) -> Iterable[OverviewRecord]:
     # parse either the J_Entrez.txt or J_Medline.txt
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
@@ -169,7 +169,7 @@ def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference
 def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[Journal]:
     """Iterate over journals."""
     overview_summary = {
-        journal.nlm_catalog_id: journal for journal in _parse_overview(ensure_j_entrez(force=force))
+        journal.nlm_catalog_id: journal for journal in _parse_journals(ensure_j_entrez(force=force))
     }
 
     catalog_to_publisher = get_catalog_to_publisher(force=force)
@@ -179,7 +179,7 @@ def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[
 
     elements = root.findall("Journal")
     for element in tqdm(elements, disable=not progress, leave=False):
-        if journal := _process_jourcache(
+        if journal := _process_journal(
             element, overview_summary, catalog_to_publisher=catalog_to_publisher
         ):
             yield journal
@@ -188,7 +188,7 @@ def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[
 START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
 
 
-def _process_jourcache(
+def _process_journal(
     element: Element, xx: dict[str, OverviewRecord], catalog_to_publisher: dict[str, NamedReference]
 ) -> Journal | None:
     jrid = element.attrib["jrid"]
@@ -196,6 +196,8 @@ def _process_jourcache(
     nlm_catalog_id = element.findtext("NlmUniqueID")
     if nlm_catalog_id is None:
         raise ValueError("no NLM catalog ID")
+
+    extra_info = xx.get(nlm_catalog_id)
 
     title = element.findtext("Name")
     issns = [
@@ -209,6 +211,10 @@ def _process_jourcache(
             active = True
         case _ as v:
             raise ValueError(f"unknown activity value: {v}")
+    synonyms = {alias_tag.text for alias_tag in element.findall("Alias")}
+    if extra_info is not None:
+        synonyms.discard(extra_info.abbreviation_iso)
+        synonyms.discard(extra_info.abbreviation_medline)
     if (start_year := element.findtext("StartYear")) and len(start_year) != 4:
         if nlm_catalog_id in START_YEAR_FIXES:
             start_year = START_YEAR_FIXES[nlm_catalog_id]
@@ -217,14 +223,6 @@ def _process_jourcache(
     if (end_year := element.findtext("EndYear")) and len(end_year) != 4:
         tqdm.write(f"[{nlm_catalog_id}] {title} - invalid end year: {end_year}")
         end_year = None
-
-    synonyms = {alias_tag.text for alias_tag in element.findall("Alias")}
-
-    extra_info = xx.get(nlm_catalog_id)
-    if extra_info is not None:
-        synonyms.discard(extra_info.abbreviation_iso)
-        synonyms.discard(extra_info.abbreviation_medline)
-
     return Journal(
         id=jrid,
         title=title,
