@@ -46,6 +46,7 @@ __all__ = [
     "get_catalog_to_publisher",
     "get_journals",
     "process_catalog",
+    "process_journal_overview",
 ]
 
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
