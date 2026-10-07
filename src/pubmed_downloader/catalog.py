@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-import csv
 import datetime
 import gzip
 import itertools as itt
 import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Literal, TextIO, cast
+from typing import Annotated, Any, Literal, TextIO, cast
 from xml.etree.ElementTree import Element
 
 import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import Reference
+from curies import NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
 from ssslm import Grounder
@@ -38,19 +37,25 @@ from .utils import (
 
 __all__ = [
     "CatalogRecord",
-    "ensure_catalog_provider_links",
+    "Journal",
     "ensure_catfile_catalog",
     "ensure_journal_overview",
     "ensure_serfile_catalog",
+    "get_catalog_to_publisher",
     "process_catalog",
-    "process_catalog_provider_links",
     "process_journal_overview",
 ]
 
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
+
+# It appears that J_Entrez and J_Medline have the same data model -
+# they both have explicit synonym types for MEDLINE and ISO annotations,
+# but doesn't include start and end years. The jourcache.xml has start
+# and end years, but doesn't annotate its synonym types
 JOURNAL_INFO_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/jourcache.xml"
-J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
+# The same content as J_Medline.txt plus NCBI molecular biology database journals
+J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
 
@@ -59,18 +64,22 @@ class Journal(BaseModel):
     """Represents a journal (a subset of NLM Catalog Records)."""
 
     id: int
-    nlm_catalog_id: str = Field(
-        ...,
-        description="The identifier for the journal in the NLM Catalog (https://www.ncbi.nlm.nih.gov/nlmcatalog)",
-    )
+    nlm_catalog_id: Annotated[
+        str,
+        Field(
+            description="The identifier for the journal in the NLM Catalog (https://www.ncbi.nlm.nih.gov/nlmcatalog)",
+        ),
+    ]
     title: str
+    aliases: list[str] | None = None
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
-    issns: list[ISSN] = Field(default_factory=list)
-    synonyms: list[str] = Field(default_factory=list)
+    issns: list[ISSN] | None = None
+    synonyms: list[str] | None = None
     active: bool = True
-    start_year: int | None
-    end_year: int | None
+    start_year: int | None = None
+    end_year: int | None = None
+    publisher: NamedReference | None = None
 
     @property
     def nlm_catalog_url(self) -> str:
@@ -117,6 +126,7 @@ def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True)
 
 
 def _parse_journals(path: Path) -> Iterable[Journal]:
+    # parse either the J_Entrez.txt or J_Medline.txt
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
             if is_delimiter:
@@ -136,55 +146,56 @@ def _parse_journals(path: Path) -> Iterable[Journal]:
                 else:
                     data[REMAPPING[key]] = value
 
-            yield Journal.model_validate(data)
+            yield Journal.model_validate(data, extra="forbid")
 
 
-class CatalogProviderLink(BaseModel):
-    """Represents a link between a NLM Catalog record and its provider."""
-
-    nlm_catalog_id: str
-    key: str = Field(..., description="Key for the NLM provider, corresponding to ")
-    label: str
-
-    @property
-    def nlm_catalog_url(self) -> str:
-        """Get the NLM Catalog URL."""
-        return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
-
-
-def process_catalog_provider_links(*, force: bool = False) -> list[CatalogProviderLink]:
-    """Ensure and process catalog record - provider links file."""
-    path = ensure_catalog_provider_links(force=force)
+def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference]:
+    """Get a mapping from NLM Catalog identifier to NLM publisher reference."""
+    path = MODULE.ensure(url=CATALOG_TO_PUBLISHER, force=force)
+    rv = {}
     with path.open() as file:
-        return [
-            CatalogProviderLink(nlm_catalog_id=nlm_catalog_id, key=key, label=name)
-            for nlm_catalog_id, key, name in csv.reader(file, delimiter="|")
-        ]
+        for i, line in enumerate(file, start=1):
+            try:
+                catalog_id, publisher_id, publisher_name = line.strip().split("|")
+            except ValueError:
+                tqdm.write(f"failed on line {i}: {line}")
+                continue
+            rv[catalog_id] = NamedReference(
+                prefix="nlm.publisher", identifier=publisher_id, name=publisher_name
+            )
+    return rv
 
 
-def ensure_catalog_provider_links(*, force: bool = False) -> Path:
-    """Ensure the xmlprovidernames.txt file is downloaded."""
-    return MODULE.ensure(url=CATALOG_TO_PUBLISHER, force=force)
+def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[Journal]:
+    """Iterate over journals."""
+    xx = {
+        journal.nlm_catalog_id: journal
+        for journal in process_journal_overview(force=force, include_entrez=True)
+    }
 
-
-def _iterate_journals(*, force: bool = False) -> Iterable[Journal]:
-    process_journal_overview(force=force)
-    process_catalog_provider_links(force=force)
+    catalog_to_publisher = get_catalog_to_publisher(force=force)
 
     path = MODULE.ensure(url=JOURNAL_INFO_PATH, force=force)
     root = etree.parse(path).getroot()
 
     elements = root.findall("Journal")
-    for element in elements:
-        journal = _process_journal(element)
-        if journal:
+    for element in tqdm(elements, disable=not progress, leave=False):
+        if journal := _process_jourcache(element, xx, catalog_to_publisher=catalog_to_publisher):
             yield journal
 
 
-def _process_journal(element: Element) -> Journal | None:
+START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
+
+
+def _process_jourcache(
+    element: Element, xx: dict[str, Journal], catalog_to_publisher: dict[str, NamedReference]
+) -> Journal | None:
     jrid = element.attrib["jrid"]
 
     nlm_catalog_id = element.findtext("NlmUniqueID")
+    if nlm_catalog_id is None:
+        raise ValueError("no NLM catalog ID")
+
     title = element.findtext("Name")
     issns = [
         ISSN(value=issn_tag.text, type=issn_tag.attrib["type"].capitalize())
@@ -199,22 +210,34 @@ def _process_journal(element: Element) -> Journal | None:
             raise ValueError(f"unknown activity value: {v}")
     synonyms = [alias_tag.text for alias_tag in element.findall("Alias")]
     if (start_year := element.findtext("StartYear")) and len(start_year) != 4:
-        tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
-        start_year = None
+        if nlm_catalog_id in START_YEAR_FIXES:
+            start_year = START_YEAR_FIXES[nlm_catalog_id]
+        else:
+            tqdm.write(f"[{nlm_catalog_id}] {title} - invalid start year: {start_year}")
     if (end_year := element.findtext("EndYear")) and len(end_year) != 4:
-        tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
+        tqdm.write(f"[{nlm_catalog_id}] {title} - invalid end year: {end_year}")
         end_year = None
 
-    # TODO abbreviations?
+    aliases = {synonym.text for synonym in element.findall("Alias") if synonym.text is not None}
+
+    extra_info = xx.get(nlm_catalog_id)
+    if extra_info is not None:
+        aliases.discard(extra_info.abbreviation_iso)
+        aliases.discard(extra_info.abbreviation_medline)
+
     return Journal(
         id=jrid,
         title=title,
         nlm_catalog_id=nlm_catalog_id,
         active=active,
+        aliases=aliases,
+        abbreviation_iso=extra_info and extra_info.abbreviation_iso,
+        abbreviation_medline=extra_info and extra_info.abbreviation_medline,
         start_year=start_year,
         end_year=end_year,
         issns=issns,
         synonyms=synonyms,
+        publisher=catalog_to_publisher.get(nlm_catalog_id),
     )
 
 
@@ -250,9 +273,9 @@ class Language(BaseModel):
 
     # TODO is this supposed to be standardized with ISO 3-letter?
     value: str
-    # this doesn't really make sense, it's one of Primary, Summary,
-    # TableOfContents, Original, or Captions
-    type: str
+
+    # this doesn't really make sense
+    type: Literal["Primary", "Summary", "TableOfContents", "Original", "Captions"]
 
 
 class TitleAlternative(BaseModel):
@@ -323,26 +346,26 @@ def _extract_alts(tag: Element) -> list[TitleAlternative]:
     # <TitleAlternate Owner="NLM" TitleType="Other">
     #     <Title Sort="N">Physiology, biochemistry and pharmacology</Title>
     # </TitleAlternate>
-    rv = []
-    for outer_tag in tag.findall("TitleAlternate"):
-        inner_tag = outer_tag.find("Title")
-        if inner_tag is None:
-            continue
+    return [
+        title_alternate
+        for title_alternate_tag in tag.findall("TitleAlternate")
+        if (title_alternate := _extract_alt(title_alternate_tag)) is not None
+    ]
 
-        title_type = outer_tag.attrib["TitleType"]
-        title_source = outer_tag.attrib["Owner"]
-        title_text = inner_tag.text
-        title_sort = inner_tag.attrib["Sort"]
 
-        rv.append(
-            TitleAlternative(
-                text=title_text,
-                source=title_source,
-                type=title_type,
-                sort=title_sort,
-            )
-        )
-    return rv
+def _extract_alt(outer_tag: Element) -> TitleAlternative | None:
+    inner_tag = outer_tag.find("Title")
+    if inner_tag is None:
+        return None
+    title_text = inner_tag.text
+    if not isinstance(title_text, str) or not title_text:
+        return None
+    return TitleAlternative(
+        text=title_text,
+        source=outer_tag.attrib["Owner"],
+        type=outer_tag.attrib["TitleType"],
+        sort=inner_tag.attrib["Sort"],
+    )
 
 
 def _extract_rels(tag: Element) -> list[TitleRelated]:
@@ -352,36 +375,39 @@ def _extract_rels(tag: Element) -> list[TitleRelated]:
     #     <RecordID Source="OCLC">1778955</RecordID>
     #     <ISSN IssnType="Undetermined">0169-8028</ISSN>
     # </TitleRelated>
-    rv = []
-    for outer_tag in tag.findall("TitleRelated"):
-        inner_tag = outer_tag.find("Title")
-        if inner_tag is None:
-            continue
+    return [
+        title_related
+        for title_related_tag in tag.findall("TitleRelated")
+        if (title_related := _extract_title_related(title_related_tag)) is not None
+    ]
 
-        title_type = outer_tag.attrib["TitleType"]
-        title_source = outer_tag.attrib["Owner"]
-        title_text = inner_tag.text
-        title_sort = inner_tag.attrib["Sort"]
 
-        issns = [
-            ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
-            for issn_tag in outer_tag.findall("ISSN")
-        ]
-        xrefs = [
-            Reference(prefix=t.attrib["Source"], identifier=t.text)
-            for t in outer_tag.findall("RecordID")
-        ]
-        rv.append(
-            TitleRelated(
-                text=title_text,
-                source=title_source,
-                type=title_type,
-                sort=title_sort,
-                issns=issns,
-                xrefs=xrefs,
-            )
-        )
-    return rv
+def _extract_title_related(tag: Element) -> TitleRelated | None:
+    inner_tag = tag.find("Title")
+    if inner_tag is None:
+        return None
+
+    title_type = tag.attrib["TitleType"]
+    title_source = tag.attrib["Owner"]
+    title_text = inner_tag.text
+    title_sort = inner_tag.attrib["Sort"]
+
+    issns = [
+        ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
+        for issn_tag in tag.findall("ISSN")
+    ]
+    xrefs = [
+        Reference(prefix=record_id_tag.attrib["Source"], identifier=record_id_tag.text)
+        for record_id_tag in tag.findall("RecordID")
+    ]
+    return TitleRelated(
+        text=title_text,
+        source=title_source,
+        type=title_type,
+        sort=title_sort,
+        issns=issns,
+        xrefs=xrefs,
+    )
 
 
 def _extract_catalog_record(  # noqa:C901
@@ -415,21 +441,24 @@ def _extract_catalog_record(  # noqa:C901
     # TODO PhysicalDescription
 
     # <ELocationList>
-    #         <ELocation>
-    #             <ELocationID EIdType="url" ValidYN="Y">http://www.psychologicabelgica.com/</ELocationID>
-    #         </ELocation>
-    #         <ELocation>
-    #             <ELocationID EIdType="url" ValidYN="Y">https://www.ncbi.nlm.nih.gov/pmc/journals/3396/</ELocationID>
-    #         </ELocation>
-    #     </ELocationList>
+    #     <ELocation>
+    #         <ELocationID EIdType="url" ValidYN="Y">http://www.psychologicabelgica.com/</ELocationID>
+    #     </ELocation>
+    #     <ELocation>
+    #         <ELocationID EIdType="url" ValidYN="Y">https://www.ncbi.nlm.nih.gov/pmc/journals/3396/</ELocationID>
+    #     </ELocation>
+    # </ELocationList>
     elocations = [
         url
-        for x in tag.findall(".//ELocationList/ELocation/ELocationID")
-        if (url := _process_elocation_tag(x))
+        for elocation_id_tag in tag.findall(".//ELocationList/ELocation/ELocationID")
+        if (url := _process_elocation_tag(elocation_id_tag))
     ]
 
     # <Language LangType="Primary">eng</Language>
-    languages = [Language(value=x.text, type=x.attrib["LangType"]) for x in tag.findall("Language")]
+    languages = [
+        Language(value=language_tag.text, type=language_tag.attrib["LangType"])
+        for language_tag in tag.findall("Language")
+    ]
 
     publication_type_mesh_ids = sorted(
         # there are less than 30 instances of this data being broken where
@@ -450,8 +479,10 @@ def _extract_catalog_record(  # noqa:C901
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
 
     authors, collectives = [], []
-    for i, x in enumerate(tag.findall(".//AuthorList/Author"), start=1):
-        match parse_author(i, x, ror_grounder=ror_grounder, author_grounder=author_grounder):
+    for i, author_tag in enumerate(tag.findall(".//AuthorList/Author"), start=1):
+        match parse_author(
+            i, author_tag, ror_grounder=ror_grounder, author_grounder=author_grounder
+        ):
             case Author() as author:
                 authors.append(author)
             case Collective() as collective:
@@ -460,6 +491,7 @@ def _extract_catalog_record(  # noqa:C901
     publication_info_tag = tag.find("PublicationInfo")
     start_year = None
     end_year = None
+    imprints = []
     if publication_info_tag is not None:
         start_year_ = publication_info_tag.findtext("PublicationFirstYear")
         if start_year_ and len(start_year_) == 4 and start_year_.isnumeric():
@@ -470,8 +502,6 @@ def _extract_catalog_record(  # noqa:C901
         if end_year == 9999:
             end_year = None
         # TODO More information about publisher available here
-
-        imprints = []
         for imprint_tag in publication_info_tag.findall("Imprint"):
             # also Place, DateIssued, and ImprintFull
             entity_tag = imprint_tag.find("Entity")
