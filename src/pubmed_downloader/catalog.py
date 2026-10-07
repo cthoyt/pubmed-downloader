@@ -672,7 +672,7 @@ def _get_imprint(imprint_tag: Element, ror_grounder: ssslm.Grounder) -> Imprint:
         entity_name = entity_tag.text.strip().strip(",").strip()
         entity_match = ror_grounder.get_best_match(entity_name)
     else:
-        entity_name= None
+        entity_name = None
         entity_match = None
 
     place_tag = imprint_tag.find("Place")
