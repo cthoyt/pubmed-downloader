@@ -308,12 +308,28 @@ class TitleRelated(BaseModel):
     xrefs: list[Reference] = Field(default_factory=list)
 
 
+CatalogStatus: TypeAlias = Literal[
+    "Completed",  # 553,846
+    "Not-Our-Cataloging",  # 176,796
+    "Withdrawn",  # 25,321
+    "In-Process",  # 5,359
+    "On-Order",  # 569
+    "Brief",  # 133
+    "Undetermined",  # 22
+]
+
+CatalogOwner: TypeAlias = Literal[
+    "NLM",  # 762,024
+    "Undetermined",  # 22
+]
+
+
 class CatalogRecord(BaseModel):
     """Represents a record in the NLM Catalog."""
 
     nlm_catalog_id: str
-    owner: str
-    status: str
+    owner: CatalogOwner
+    status: CatalogStatus
     title: str
     title_sort: Literal["N"] | int
     medline_short_title: str | None = None
@@ -717,11 +733,15 @@ def _process_other_id(tag: Element) -> Reference | None:
     return Reference(prefix=prefix, identifier=identifier)
 
 
-def process_catalog(*, force_process: bool = False, refresh_index: bool = True) -> list[CatalogRecord]:
+def process_catalog(
+    *, force_process: bool = False, refresh_index: bool = True
+) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
     if CATALOG_PROCESSED_GZ_PATH.is_file() and not force_process:
         return read_pydantic_jsonl(CATALOG_PROCESSED_GZ_PATH, CatalogRecord)
-    catalog_records = list(iterate_process_catalog(force_process=force_process, refresh_index=refresh_index))
+    catalog_records = list(
+        iterate_process_catalog(force_process=force_process, refresh_index=refresh_index)
+    )
     write_pydantic_jsonl(catalog_records, CATALOG_PROCESSED_GZ_PATH)
     return catalog_records
 
@@ -737,7 +757,9 @@ def iterate_process_catalog(
     mesh_grounder = cast(Grounder, pyobo.get_grounder("mesh"))
     author_grounder: Grounder = get_orcid_grounder()
 
-    for path in tqdm(ensure_serfile_catalog(refresh_index=refresh_index), desc="Processing NLM Catalog"):
+    for path in tqdm(
+        ensure_serfile_catalog(refresh_index=refresh_index), desc="Processing NLM Catalog"
+    ):
         yield from _parse_catalog(
             path,
             force_process=force_process,
@@ -828,10 +850,13 @@ def _iter_serfile_urls(*, refresh: bool = True) -> Iterable[str]:
         refresh=refresh,
     )
 
-def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str, *, refresh: bool = True) -> Iterable[str]:
-    path = MODULE.join(name=f"{include_prefix}-index.txt")
+
+def _iter_catalog_urls(
+    base: str, skip_prefix: str, include_prefix: str, *, refresh: bool = True
+) -> Iterable[str]:
+    path: Path = MODULE.join(name=f"{include_prefix}-index.txt")
     if path.is_file() and not refresh:
-        yield from path.readlines()
+        yield from path.read_text().splitlines()
     else:
         urls = list(_iter_catalog_urls_helper(base, skip_prefix, include_prefix))
         path.write_text("\n".join(urls))
