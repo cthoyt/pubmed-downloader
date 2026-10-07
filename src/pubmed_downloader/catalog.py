@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import csv
 import datetime
-import gzip
 import itertools as itt
-import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast, overload
@@ -16,7 +14,7 @@ import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import NamableReference, NamedReference, Reference
+from curies import NamableReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
 from pydantic_extra_types.language_code import ISO639_3
@@ -625,7 +623,7 @@ def _get_imprint(imprint_tag: Element, ror_grounder: ssslm.Grounder) -> Imprint:
         entity_name = entity_tag.text.strip().strip(",").strip()
         entity_match = ror_grounder.get_best_match(entity_name)
     else:
-        entity_name= None
+        entity_name = None
         entity_match = None
 
     place_tag = imprint_tag.find("Place")
