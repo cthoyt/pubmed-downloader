@@ -6,7 +6,7 @@ import datetime
 import itertools as itt
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Annotated, Any, Literal, TypeAlias, cast, overload
+from typing import Any, Literal, TypeAlias, cast, overload
 from xml.etree.ElementTree import Element
 
 import click
@@ -83,14 +83,11 @@ class Journal(BaseModel):
     """Represents a journal (a subset of NLM Catalog Records)."""
 
     id: int
-    nlm_catalog_id: Annotated[
-        str,
-        Field(
-            description="The identifier for the journal in the NLM Catalog (https://www.ncbi.nlm.nih.gov/nlmcatalog)",
-        ),
-    ]
+    nlm_catalog_id: str = Field(
+        ...,
+        description="The identifier for the journal in the NLM Catalog (https://www.ncbi.nlm.nih.gov/nlmcatalog)",
+    )
     title: str
-    aliases: list[str] | None = None
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
     issns: list[ISSN] = Field(default_factory=list)
@@ -114,6 +111,36 @@ REMAPPING = {
     "IsoAbbr": "abbreviation_iso",
     "NlmId": "nlm_catalog_id",
 }
+
+
+def process_journal_overview(
+    *, force: bool = False, include_entrez: bool = True
+) -> list[OverviewRecord]:
+    """Get the list of journals appearing in PubMed/MEDLINE.
+
+    :param force: Should the data be re-downloaded?
+    :param include_entrez:
+        If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
+        both the PubMed/MEDLINE and NCBI molecular biology database journals.
+    :returns: A list of journal objects parsed from the overview file
+    """
+    path = ensure_journal_overview(force=force, include_entrez=include_entrez)
+    return list(_parse_journals(path))
+
+
+def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True) -> Path:
+    """Ensure the journal overview file is downloaded.
+
+    :param force: Should the data be re-downloaded?
+    :param include_entrez:
+        If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
+        both the PubMed/MEDLINE and NCBI molecular biology database journals.
+    :returns: A path to the journal overview file
+    """
+    if include_entrez:
+        return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
+    else:
+        return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
 
 
 def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]:
