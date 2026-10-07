@@ -142,7 +142,6 @@ def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True)
 
 
 def _parse_journals(path: Path) -> Iterable[JournalShort]:
-    # parse either the J_Entrez.txt or J_Medline.txt
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
             if is_delimiter:
