@@ -57,6 +57,8 @@ J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.jsonl.gz")
 
+START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
+
 
 def ensure_j_medline(*, force: bool = False) -> Path:
     """Ensure the overview file for PubMed/MEDLINE journals is downloaded."""
@@ -167,7 +169,7 @@ def _parse_journals(path: Path) -> Iterable[Journal2]:
 
 def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference]:
     """Get a mapping from NLM Catalog identifier to NLM publisher reference."""
-    path = MODULE.ensure(url=CATALOG_TO_PUBLISHER, force=force)
+    path = ensure_catalog_provider_links(force=force)
     rv = {}
     with path.open() as file:
         for i, line in enumerate(file, start=1):
@@ -180,6 +182,11 @@ def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference
                 prefix="nlm.publisher", identifier=publisher_id, name=publisher_name
             )
     return rv
+
+
+def ensure_catalog_provider_links(*, force: bool = False) -> Path:
+    """Ensure the xmlprovidernames.txt file is downloaded."""
+    return MODULE.ensure(url=CATALOG_TO_PUBLISHER, force=force)
 
 
 def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]:
@@ -208,9 +215,6 @@ def _iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable
             element, overview_summary, catalog_to_publisher=catalog_to_publisher
         ):
             yield journal
-
-
-START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
 
 
 def _process_journal(
@@ -244,9 +248,9 @@ def _process_journal(
         if nlm_catalog_id in START_YEAR_FIXES:
             start_year = START_YEAR_FIXES[nlm_catalog_id]
         else:
-            tqdm.write(f"[{nlm_catalog_id}] {title} - invalid start year: {start_year}")
+            tqdm.write(f"[{nlm_catalog_id}] - invalid start year: {start_year}")
     if (end_year := element.findtext("EndYear")) and len(end_year) != 4:
-        tqdm.write(f"[{nlm_catalog_id}] {title} - invalid end year: {end_year}")
+        tqdm.write(f"[{nlm_catalog_id}] - invalid end year: {end_year}")
         end_year = None
     return Journal(
         id=jrid,
