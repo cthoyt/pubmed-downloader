@@ -301,7 +301,8 @@ class Imprint(BaseModel):
     type: Literal["Original", "Current"] | None = None
     function_type: str | None = None
     place: str | None = None
-    entity: NamableReference | None = None
+    name: str | None = None
+    reference: NamableReference | None = None
     date_issued: str | None = None  # TODO parse in start/end?
 
 
@@ -671,16 +672,18 @@ def _get_imprint(imprint_tag: Element, ror_grounder: ssslm.Grounder) -> Imprint:
         entity_name = entity_tag.text.strip().strip(",").strip()
         entity_match = ror_grounder.get_best_match(entity_name)
     else:
+        entity_name= None
         entity_match = None
 
     place_tag = imprint_tag.find("Place")
     if place_tag is not None and place_tag.text:
-        place = place_tag.text.strip().lstrip("[").rstrip(":").rstrip().rstrip("]").rstrip()
+        place = place_tag.text.strip().lstrip("[").rstrip(": ,.]")
     else:
         place = None
 
     return Imprint(
-        entity=entity_match.reference if entity_match else None,
+        name=entity_name,
+        reference=entity_match.reference if entity_match else None,
         place=place,
         type=imprint_tag.attrib.get("ImprintType"),
         function_type=imprint_tag.attrib.get("FunctionType"),
@@ -952,6 +955,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:
     publication_type_counter: Counter[str] = Counter()
     imprint_type_counter: Counter[str] = Counter()
     imprint_count_counter: Counter[int] = Counter()
+    imprint_place_counter: Counter[str] = Counter()
     imprint_counter: Counter[str] = Counter()
     language_counter: Counter[str] = Counter()
     language_type_counter: Counter[str] = Counter()
@@ -974,7 +978,8 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             publication_type_counter[pt] += 1
 
         for imprint in record.imprints:
-            imprint_counter[imprint.entity.curie if imprint.entity else "none"] += 1
+            imprint_counter[imprint.name or "none"] += 1
+            imprint_place_counter[imprint.place or "none"] += 1
             imprint_type_counter[imprint.type or "none"] += 1
 
         for lang in record.languages:
@@ -996,13 +1001,14 @@ def _main(force_process: bool, refresh_index: bool) -> None:
     def _tabulate(counter: Counter[Any], title: str, *, n: int | None = None) -> None:
         click.echo()
         if n is not None:
-            click.secho(f"showing top {n}", fg="grey")
+            click.secho(f"showing top {n}", fg="yellow")
         click.echo(tabulate(counter.most_common(n=n), headers=[title, "Count"], tablefmt="github"))
 
     _tabulate(status_counter, "Publication Status")
     _tabulate(owner_counter, "Publication Owner")
     _tabulate(publication_type_counter, "Publication Type")
-    _tabulate(imprint_counter, "Imprint", n=15)
+    _tabulate(imprint_counter, "Imprint", n=50)
+    _tabulate(imprint_place_counter, "Imprint Place", n=50)
     _tabulate(imprint_type_counter, "Imprint Type")
     _tabulate(imprint_count_counter, "Imprint Arity")
     _tabulate(language_type_counter, "Language Type")
