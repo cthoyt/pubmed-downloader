@@ -13,7 +13,7 @@ import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import NamedReference, Reference
+from curies import NamableReference, NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
 from pydantic_extra_types.language_code import ISO639_3
@@ -301,7 +301,8 @@ class Imprint(BaseModel):
     type: Literal["Original", "Current"] | None = None
     function_type: str | None = None
     place: str | None = None
-    entity: str | None = None
+    entity: NamableReference | None = None
+    date_issued: str | None = None  # TODO parse in start/end?
 
 
 class Language(BaseModel):
@@ -502,6 +503,8 @@ LEGACY_LANGUAGE_CODE_TO_STANDARD = {
     "bur": "mya",
 }
 
+ENTITY_MISSES: set[str] = set()
+
 
 def _extract_catalog_record(  # noqa:C901
     tag: Element,
@@ -586,7 +589,11 @@ def _extract_catalog_record(  # noqa:C901
     publication_info_tag = tag.find("PublicationInfo")
     start_year = None
     end_year = None
-    imprints = []
+
+    # there are only 70 that have more than one across the whole database,
+    # so for simplicity, we drop the second on all of those by prioritizing
+    # by ImprintType="Current"
+    imprints: list[Imprint] = []
     if publication_info_tag is not None:
         start_year_ = publication_info_tag.findtext("PublicationFirstYear")
         if start_year_ and len(start_year_) == 4 and start_year_.isnumeric():
@@ -596,22 +603,10 @@ def _extract_catalog_record(  # noqa:C901
             end_year = int(end_year_)
         if end_year == 9999:
             end_year = None
-        # TODO More information about publisher available here
-        for imprint_tag in publication_info_tag.findall("Imprint"):
-            # also Place, DateIssued, and ImprintFull
-            entity_tag = imprint_tag.find("Entity")
-            if entity_tag is not None and entity_tag.text:
-                entity = entity_tag.text.strip().strip(",").strip()
-            else:
-                entity = None
-            imprints.append(
-                Imprint(
-                    entity=entity,
-                    place=imprint_tag.findtext("Place"),
-                    type=imprint_tag.attrib.get("ImprintType"),
-                    function_type=imprint_tag.attrib.get("FunctionType"),
-                )
-            )
+        imprints.extend(
+            _get_imprint(imprint_tag, ror_grounder=ror_grounder)
+            for imprint_tag in publication_info_tag.findall("Imprint")
+        )
 
     issns = [
         ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
@@ -655,6 +650,41 @@ def _extract_catalog_record(  # noqa:C901
         resource_info=_get_resource_info(tag.find("ResourceInfo")),
         languages=languages,
         elocations=elocations,
+    )
+
+
+def _get_imprint(imprint_tag: Element, ror_grounder: ssslm.Grounder) -> Imprint:
+    """Extract information from an imprint.
+
+    .. code-block:: xml
+
+        <Imprint ImprintType="Original" FunctionType="Publication">
+            <Place>Thousand Oaks, CA :</Place>
+            <Entity>SAGE Publishing,</Entity>
+            <DateIssued>[2023]-</DateIssued>
+            <ImprintFull>Thousand Oaks, CA : SAGE Publishing, [2023]-</ImprintFull>
+        </Imprint>
+    """
+    # TODO DateIssued (which might be a range?)
+    entity_tag = imprint_tag.find("Entity")
+    if entity_tag is not None and entity_tag.text:
+        entity_name = entity_tag.text.strip().strip(",").strip()
+        entity_match = ror_grounder.get_best_match(entity_name)
+    else:
+        entity_match = None
+
+    place_tag = imprint_tag.find("Place")
+    if place_tag is not None and place_tag.text:
+        place = place_tag.text.strip().lstrip("[").rstrip(":").rstrip().rstrip("]").rstrip()
+    else:
+        place = None
+
+    return Imprint(
+        entity=entity_match.reference if entity_match else None,
+        place=place,
+        type=imprint_tag.attrib.get("ImprintType"),
+        function_type=imprint_tag.attrib.get("FunctionType"),
+        date_issued=imprint_tag.findtext("DateIssued"),
     )
 
 
@@ -921,6 +951,8 @@ def _main(force_process: bool, refresh_index: bool) -> None:
 
     publication_type_counter: Counter[str] = Counter()
     imprint_type_counter: Counter[str] = Counter()
+    imprint_count_counter: Counter[int] = Counter()
+    imprint_counter: Counter[str] = Counter()
     language_counter: Counter[str] = Counter()
     language_type_counter: Counter[str] = Counter()
     type_counter: Counter[str] = Counter()
@@ -942,12 +974,14 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             publication_type_counter[pt] += 1
 
         for imprint in record.imprints:
+            imprint_counter[imprint.entity.curie if imprint.entity else "none"] += 1
             imprint_type_counter[imprint.type or "none"] += 1
 
         for lang in record.languages:
             language_counter[lang.value] += 1
             language_type_counter[lang.type] += 1
 
+        imprint_count_counter[len(record.imprints or [])] += 1
         status_counter[record.status] += 1
         owner_counter[record.owner] += 1
         type_counter[resource_info.type] += 1
@@ -959,16 +993,18 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             media_type_counter[resource_info.resource.media_type] += 1
             carrier_type_counter[resource_info.resource.carrier_type] += 1
 
-    def _tabulate(counter: Counter[str], title: str) -> None:
-        click.echo(
-            "\n" + tabulate(counter.most_common(), headers=[title, "Count"], tablefmt="github")
-        )
+    def _tabulate(counter: Counter[Any], title: str, *, n: int | None = None) -> None:
+        click.echo()
+        if n is not None:
+            click.secho(f"showing top {n}", fg="grey")
+        click.echo(tabulate(counter.most_common(n=n), headers=[title, "Count"], tablefmt="github"))
 
     _tabulate(status_counter, "Publication Status")
     _tabulate(owner_counter, "Publication Owner")
     _tabulate(publication_type_counter, "Publication Type")
+    _tabulate(imprint_counter, "Imprint", n=15)
     _tabulate(imprint_type_counter, "Imprint Type")
-    _tabulate(language_counter, "Language")
+    _tabulate(imprint_count_counter, "Imprint Arity")
     _tabulate(language_type_counter, "Language Type")
     _tabulate(type_counter, "Resource Type")
     _tabulate(issuance_counter, "Resource Issuance")
