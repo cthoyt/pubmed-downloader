@@ -7,7 +7,7 @@ import logging
 import re
 from calendar import monthrange
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Literal
 from xml.etree.ElementTree import Element
 
 import pystow
@@ -350,12 +350,19 @@ def _get_mesh_id(
     descriptor_name_tag: Element, mesh_heading_tag: Element | None = None
 ) -> str | None:
     if "UI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
-    if "URI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
-    if mesh_heading_tag is not None and "URI" in mesh_heading_tag.attrib:
-        return mesh_heading_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
-    return None
+        mesh_id = descriptor_name_tag.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
+    elif "URI" in descriptor_name_tag.attrib:
+        mesh_id = descriptor_name_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    elif mesh_heading_tag is not None and "URI" in mesh_heading_tag.attrib:
+        mesh_id = mesh_heading_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    else:
+        return None
+    mesh_id = (
+        mesh_id.removeprefix("(uri) http://id.nlm.nih.gov/mesh/")
+        .removeprefix("http://id.nlm.nih.gov/mesh/")
+        .removeprefix("(DNLM)")
+    )
+    return mesh_id
 
 
 def _parse_yn(s: str) -> bool:
@@ -391,12 +398,6 @@ def _clean_orcid(s: str) -> str | None:
     else:
         logger.debug(f"unhandled ORCID: {s}")
         return None
-
-
-def _json_default(o: Any) -> Any:
-    if isinstance(o, datetime.date | datetime.datetime):
-        return o.isoformat()
-    return o
 
 
 def clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:
