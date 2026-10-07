@@ -717,17 +717,17 @@ def _process_other_id(tag: Element) -> Reference | None:
     return Reference(prefix=prefix, identifier=identifier)
 
 
-def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
+def process_catalog(*, force_process: bool = False, refresh_index: bool = True) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
     if CATALOG_PROCESSED_GZ_PATH.is_file() and not force_process:
         return read_pydantic_jsonl(CATALOG_PROCESSED_GZ_PATH, CatalogRecord)
-    catalog_records = list(iterate_process_catalog(force=force, force_process=force_process))
+    catalog_records = list(iterate_process_catalog(force_process=force_process, refresh_index=refresh_index))
     write_pydantic_jsonl(catalog_records, CATALOG_PROCESSED_GZ_PATH)
     return catalog_records
 
 
 def iterate_process_catalog(
-    *, force: bool = False, force_process: bool = False
+    *, force_process: bool = False, refresh_index: bool = True
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
     import pyobo
@@ -737,24 +737,24 @@ def iterate_process_catalog(
     mesh_grounder = cast(Grounder, pyobo.get_grounder("mesh"))
     author_grounder: Grounder = get_orcid_grounder()
 
-    for path in tqdm(ensure_serfile_catalog(force=force), desc="Processing NLM Catalog"):
+    for path in tqdm(ensure_serfile_catalog(refresh_index=refresh_index), desc="Processing NLM Catalog"):
         yield from _parse_catalog(
             path,
-            force_process=force_process or force,
+            force_process=force_process,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
             author_grounder=author_grounder,
         )
 
 
-def ensure_catfile_catalog(*, force: bool = False) -> list[Path]:
+def ensure_catfile_catalog(*, refresh_index: bool = True) -> list[Path]:
     """Get the entire NLM Catalog via CatfilePlus files."""
-    return list(_iter_catfile_catalog(force=force))
+    return list(_iter_catfile_catalog(refresh_index=refresh_index))
 
 
-def ensure_serfile_catalog(*, force: bool = False) -> list[Path]:
+def ensure_serfile_catalog(*, refresh_index: bool = True) -> list[Path]:
     """Get the entire NLM Catalog via Serfile files."""
-    return list(_iter_serfile_catalog(force=force))
+    return list(_iter_serfile_catalog(refresh_index=refresh_index))
 
 
 def _parse_catalog(
@@ -789,21 +789,21 @@ def _parse_catalog(
         yield from catalog_records
 
 
-def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
+def _iter_catfile_catalog(*, refresh_index: bool = True) -> Iterable[Path]:
     module = MODULE.module("catalog-catfile")
     return thread_map(  # type:ignore
-        lambda x: module.ensure(url=x, force=force),
-        _iter_catpluslease_urls(),
+        lambda url: module.ensure(url=url),
+        _iter_catpluslease_urls(refresh=refresh_index),
         desc="Downloading catalog catfiles",
         leave=False,
     )
 
 
-def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
+def _iter_serfile_catalog(*, refresh_index: bool = True) -> Iterable[Path]:
     module = MODULE.module("catalog-serfile")
     return thread_map(  # type:ignore
-        lambda x: module.ensure(url=x, force=force),
-        _iter_serfile_urls(),
+        lambda url: module.ensure(url=url),
+        _iter_serfile_urls(refresh=refresh_index),
         desc="Downloading catalog serfiles",
         leave=False,
     )
@@ -859,7 +859,8 @@ def _iter_catalog_urls_helper(base: str, skip_prefix: str, include_prefix: str) 
 
 @click.command(name="catalog")
 @click.option("-f", "--force-process", is_flag=True)
-def _main(force_process: bool) -> None:
+@click.option("--refresh-index/--no-refresh-index", is_flag=True)
+def _main(force_process: bool, refresh_index: bool) -> None:
     """Download and process the NLM catalog."""
     from collections import Counter
 
@@ -878,7 +879,7 @@ def _main(force_process: bool) -> None:
     status_counter: Counter[str] = Counter()
     owner_counter: Counter[str] = Counter()
 
-    records = process_catalog(force_process=force_process)
+    records = process_catalog(force_process=force_process, refresh_index=refresh_index)
     click.echo(f"There are {len(records):,} catalog records")
     for record in records:
         resource_info = record.resource_info
