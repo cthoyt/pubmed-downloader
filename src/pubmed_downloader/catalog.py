@@ -75,29 +75,25 @@ def ensure_j_entrez(*, force: bool = False) -> Path:
     return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
 
 
-class Journal2(BaseModel):
+class BaseJournal(BaseModel):
     """Represents records in the J_Entrez and J_medline files."""
 
     id: int
     nlm_catalog_id: str
     title: str
-    abbreviation_medline: str | None = None
-    abbreviation_iso: str | None = None
     issns: list[ISSN] = Field(default_factory=list)
 
 
-class Journal(BaseModel):
+class JournalShort(BaseJournal):
+    """Represents records in the J_Entrez and J_Medline files."""
+
+    abbreviation_medline: str | None = None
+    abbreviation_iso: str | None = None
+
+
+class Journal(BaseJournal):
     """Represents a journal (a subset of NLM Catalog Records)."""
 
-    id: int
-    nlm_catalog_id: str = Field(
-        ...,
-        description="The identifier for the journal in the NLM Catalog (https://www.ncbi.nlm.nih.gov/nlmcatalog)",
-    )
-    title: str
-    abbreviation_medline: str | None = None
-    abbreviation_iso: str | None = None
-    issns: list[ISSN] = Field(default_factory=list)
     synonyms: list[str] = Field(default_factory=list)
     active: bool = True
     start_year: int | None = None
@@ -120,7 +116,9 @@ REMAPPING = {
 }
 
 
-def process_journal_overview(*, force: bool = False, include_entrez: bool = True) -> list[Journal2]:
+def process_journal_overview(
+    *, force: bool = False, include_entrez: bool = True
+) -> list[JournalShort]:
     """Get the list of journals appearing in PubMed/MEDLINE.
 
     :param force: Should the data be re-downloaded?
@@ -148,7 +146,7 @@ def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True)
         return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
 
 
-def _parse_journals(path: Path) -> Iterable[Journal2]:
+def _parse_journals(path: Path) -> Iterable[JournalShort]:
     # parse either the J_Entrez.txt or J_Medline.txt
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
@@ -169,7 +167,7 @@ def _parse_journals(path: Path) -> Iterable[Journal2]:
                 else:
                     data[REMAPPING[key]] = value
 
-            yield Journal2.model_validate(data, extra="forbid")
+            yield JournalShort.model_validate(data, extra="forbid")
 
 
 def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference]:
@@ -223,7 +221,7 @@ def _iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable
 
 
 def _process_journal(
-    element: Element, xx: dict[str, Journal2], catalog_to_publisher: dict[str, NamedReference]
+    element: Element, xx: dict[str, JournalShort], catalog_to_publisher: dict[str, NamedReference]
 ) -> Journal | None:
     jrid = element.attrib["jrid"]
 
