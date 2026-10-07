@@ -910,8 +910,10 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             continue
         for pt in record.publication_type_mesh_ids:
             publication_type_counter[pt] += 1
+
         for imprint in record.imprints:
             imprint_type_counter[imprint.type] += 1
+
         for lang in record.languages:
             language_counter[lang.value] += 1
             language_type_counter[lang.type] += 1
