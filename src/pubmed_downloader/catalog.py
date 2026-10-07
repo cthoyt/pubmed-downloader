@@ -68,7 +68,7 @@ def ensure_j_entrez(*, force: bool = False) -> Path:
     return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
 
 
-class OverviewRecord(BaseModel):
+class Journal2(BaseModel):
     """Represents records in the J_Entrez and J_medline files."""
 
     id: int
@@ -113,9 +113,7 @@ REMAPPING = {
 }
 
 
-def process_journal_overview(
-    *, force: bool = False, include_entrez: bool = True
-) -> list[OverviewRecord]:
+def process_journal_overview(*, force: bool = False, include_entrez: bool = True) -> list[Journal2]:
     """Get the list of journals appearing in PubMed/MEDLINE.
 
     :param force: Should the data be re-downloaded?
@@ -143,16 +141,7 @@ def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True)
         return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
 
 
-def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]:
-    """Get the list of journals appearing in PubMed/MEDLINE.
-
-    :param force: Should the data be re-downloaded?
-    :returns: A list of journal objects parsed from the overview file
-    """
-    return list(iterate_journals(force=force, progress=progress))
-
-
-def _parse_journals(path: Path) -> Iterable[OverviewRecord]:
+def _parse_journals(path: Path) -> Iterable[Journal2]:
     # parse either the J_Entrez.txt or J_Medline.txt
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
@@ -173,7 +162,7 @@ def _parse_journals(path: Path) -> Iterable[OverviewRecord]:
                 else:
                     data[REMAPPING[key]] = value
 
-            yield OverviewRecord.model_validate(data, extra="forbid")
+            yield Journal2.model_validate(data, extra="forbid")
 
 
 def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference]:
@@ -193,7 +182,16 @@ def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference
     return rv
 
 
-def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[Journal]:
+def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]:
+    """Get the list of journals appearing in PubMed/MEDLINE.
+
+    :param force: Should the data be re-downloaded?
+    :returns: A list of journal objects parsed from the overview file
+    """
+    return list(_iterate_journals(force=force, progress=progress))
+
+
+def _iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[Journal]:
     """Iterate over journals."""
     overview_summary = {
         journal.nlm_catalog_id: journal for journal in _parse_journals(ensure_j_entrez(force=force))
@@ -216,7 +214,7 @@ START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
 
 
 def _process_journal(
-    element: Element, xx: dict[str, OverviewRecord], catalog_to_publisher: dict[str, NamedReference]
+    element: Element, xx: dict[str, Journal2], catalog_to_publisher: dict[str, NamedReference]
 ) -> Journal | None:
     jrid = element.attrib["jrid"]
 
