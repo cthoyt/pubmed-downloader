@@ -7,7 +7,7 @@ import logging
 import re
 from calendar import monthrange
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Literal
 from xml.etree.ElementTree import Element
 
 import pystow
@@ -391,12 +391,6 @@ def _clean_orcid(s: str) -> str | None:
     else:
         logger.debug(f"unhandled ORCID: {s}")
         return None
-
-
-def _json_default(o: Any) -> Any:
-    if isinstance(o, datetime.date | datetime.datetime):
-        return o.isoformat()
-    return o
 
 
 def clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:

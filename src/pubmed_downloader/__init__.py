@@ -19,11 +19,10 @@ from .api import (
 from .catalog import (
     CatalogRecord,
     ensure_catfile_catalog,
-    ensure_journal_overview,
     ensure_serfile_catalog,
     get_catalog_to_publisher,
+    get_journals,
     process_catalog,
-    process_journal_overview,
 )
 from .client import (
     count_search_results,
@@ -49,7 +48,6 @@ __all__ = [
     "count_search_results",
     "ensure_baselines",
     "ensure_catfile_catalog",
-    "ensure_journal_overview",
     "ensure_serfile_catalog",
     "ensure_updates",
     "get_abstracts",
@@ -57,6 +55,7 @@ __all__ = [
     "get_articles",
     "get_articles_dict",
     "get_catalog_to_publisher",
+    "get_journals",
     "get_titles",
     "get_titles_dict",
     "iterate_ensure_articles",
@@ -68,7 +67,6 @@ __all__ = [
     "process_articles",
     "process_baselines",
     "process_catalog",
-    "process_journal_overview",
     "process_updates",
     "search",
 ]

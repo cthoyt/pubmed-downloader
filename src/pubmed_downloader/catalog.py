@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import datetime
-import gzip
 import itertools as itt
-import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Annotated, Any, Literal, TextIO, cast
+from typing import Annotated, Any, Literal, cast, overload
 from xml.etree.ElementTree import Element
 
 import click
@@ -18,6 +16,7 @@ from bs4 import BeautifulSoup
 from curies import NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
+from pystow.utils import read_pydantic_json_list, write_pydantic_json_list
 from ssslm import Grounder
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
@@ -29,7 +28,6 @@ from .utils import (
     Collective,
     Heading,
     _get_mesh_id,
-    _json_default,
     parse_author,
     parse_date,
     parse_mesh_heading,
@@ -39,11 +37,10 @@ __all__ = [
     "CatalogRecord",
     "Journal",
     "ensure_catfile_catalog",
-    "ensure_journal_overview",
     "ensure_serfile_catalog",
     "get_catalog_to_publisher",
+    "get_journals",
     "process_catalog",
-    "process_journal_overview",
 ]
 
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
@@ -58,6 +55,17 @@ J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
 J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
+
+
+class OverviewRecord(BaseModel):
+    """Represents records in the J_Entrez and J_medline files."""
+
+    id: int
+    nlm_catalog_id: str
+    title: str
+    abbreviation_medline: str | None = None
+    abbreviation_iso: str | None = None
+    issns: list[ISSN] | None = None
 
 
 class Journal(BaseModel):
@@ -97,35 +105,26 @@ REMAPPING = {
 }
 
 
-def process_journal_overview(*, force: bool = False, include_entrez: bool = True) -> list[Journal]:
+def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]:
     """Get the list of journals appearing in PubMed/MEDLINE.
 
     :param force: Should the data be re-downloaded?
-    :param include_entrez:
-        If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
-        both the PubMed/MEDLINE and NCBI molecular biology database journals.
     :returns: A list of journal objects parsed from the overview file
     """
-    path = ensure_journal_overview(force=force, include_entrez=include_entrez)
-    return list(_parse_journals(path))
+    return list(iterate_journals(force=force, progress=progress))
 
 
-def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True) -> Path:
-    """Ensure the journal overview file is downloaded.
-
-    :param force: Should the data be re-downloaded?
-    :param include_entrez:
-        If false, downloads only the PubMed/MEDLINE data. If true (default), downloads
-        both the PubMed/MEDLINE and NCBI molecular biology database journals.
-    :returns: A path to the journal overview file
-    """
-    if include_entrez:
-        return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
-    else:
-        return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
+def ensure_j_medline(*, force: bool = False) -> Path:
+    """Ensure the overview file for PubMed/MEDLINE journals is downloaded."""
+    return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
 
 
-def _parse_journals(path: Path) -> Iterable[Journal]:
+def ensure_j_entrez(*, force: bool = False) -> Path:
+    """Ensure the overview file for PubMed/MEDLINE extended with NCBI molecular biology database journals is downloaded."""  # noqa:E501
+    return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
+
+
+def _parse_overview(path: Path) -> Iterable[OverviewRecord]:
     # parse either the J_Entrez.txt or J_Medline.txt
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
@@ -146,7 +145,7 @@ def _parse_journals(path: Path) -> Iterable[Journal]:
                 else:
                     data[REMAPPING[key]] = value
 
-            yield Journal.model_validate(data, extra="forbid")
+            yield OverviewRecord.model_validate(data, extra="forbid")
 
 
 def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference]:
@@ -168,9 +167,8 @@ def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference
 
 def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[Journal]:
     """Iterate over journals."""
-    xx = {
-        journal.nlm_catalog_id: journal
-        for journal in process_journal_overview(force=force, include_entrez=True)
+    overview_summary = {
+        journal.nlm_catalog_id: journal for journal in _parse_overview(ensure_j_entrez(force=force))
     }
 
     catalog_to_publisher = get_catalog_to_publisher(force=force)
@@ -180,7 +178,9 @@ def iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[
 
     elements = root.findall("Journal")
     for element in tqdm(elements, disable=not progress, leave=False):
-        if journal := _process_jourcache(element, xx, catalog_to_publisher=catalog_to_publisher):
+        if journal := _process_jourcache(
+            element, overview_summary, catalog_to_publisher=catalog_to_publisher
+        ):
             yield journal
 
 
@@ -188,7 +188,7 @@ START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
 
 
 def _process_jourcache(
-    element: Element, xx: dict[str, Journal], catalog_to_publisher: dict[str, NamedReference]
+    element: Element, xx: dict[str, OverviewRecord], catalog_to_publisher: dict[str, NamedReference]
 ) -> Journal | None:
     jrid = element.attrib["jrid"]
 
@@ -208,7 +208,6 @@ def _process_jourcache(
             active = True
         case _ as v:
             raise ValueError(f"unknown activity value: {v}")
-    synonyms = [alias_tag.text for alias_tag in element.findall("Alias")]
     if (start_year := element.findtext("StartYear")) and len(start_year) != 4:
         if nlm_catalog_id in START_YEAR_FIXES:
             start_year = START_YEAR_FIXES[nlm_catalog_id]
@@ -218,19 +217,18 @@ def _process_jourcache(
         tqdm.write(f"[{nlm_catalog_id}] {title} - invalid end year: {end_year}")
         end_year = None
 
-    aliases = {synonym.text for synonym in element.findall("Alias") if synonym.text is not None}
+    synonyms = {alias_tag.text for alias_tag in element.findall("Alias")}
 
     extra_info = xx.get(nlm_catalog_id)
     if extra_info is not None:
-        aliases.discard(extra_info.abbreviation_iso)
-        aliases.discard(extra_info.abbreviation_medline)
+        synonyms.discard(extra_info.abbreviation_iso)
+        synonyms.discard(extra_info.abbreviation_medline)
 
     return Journal(
         id=jrid,
         title=title,
         nlm_catalog_id=nlm_catalog_id,
         active=active,
-        aliases=aliases,
         abbreviation_iso=extra_info and extra_info.abbreviation_iso,
         abbreviation_medline=extra_info and extra_info.abbreviation_medline,
         start_year=start_year,
@@ -253,8 +251,7 @@ class ResourceInfo(BaseModel):
     """Represents a resource info annotation to a catalog record."""
 
     type: str
-    # issuance only ever has one value: "continuing"
-    issuance: str
+    issuance: Literal["continuing"]
     resource_units: list[str]
     resource: Resource | None = None
 
@@ -387,9 +384,11 @@ def _extract_title_related(tag: Element) -> TitleRelated | None:
     if inner_tag is None:
         return None
 
+    if inner_tag.text is None:
+        raise ValueError
+
     title_type = tag.attrib["TitleType"]
     title_source = tag.attrib["Owner"]
-    title_text = inner_tag.text
     title_sort = inner_tag.attrib["Sort"]
 
     issns = [
@@ -401,7 +400,7 @@ def _extract_title_related(tag: Element) -> TitleRelated | None:
         for record_id_tag in tag.findall("RecordID")
     ]
     return TitleRelated(
-        text=title_text,
+        text=inner_tag.text,
         source=title_source,
         type=title_type,
         sort=title_sort,
@@ -451,7 +450,7 @@ def _extract_catalog_record(  # noqa:C901
     elocations = [
         url
         for elocation_id_tag in tag.findall(".//ELocationList/ELocation/ELocationID")
-        if (url := _process_elocation_tag(elocation_id_tag))
+        if (url := _process_elocation_tag(elocation_id_tag)) is not None
     ]
 
     # <Language LangType="Primary">eng</Language>
@@ -473,7 +472,7 @@ def _extract_catalog_record(  # noqa:C901
     mesh_headings = [
         heading
         for x in tag.findall(".//MeshHeadingList/MeshHeading")
-        if (heading := parse_mesh_heading(x, mesh_grounder=mesh_grounder))
+        if (heading := parse_mesh_heading(x, mesh_grounder=mesh_grounder)) is not None
     ]
 
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
@@ -557,7 +556,7 @@ def _extract_catalog_record(  # noqa:C901
         collectives=collectives,
         resource_info=_get_resource_info(tag.find("ResourceInfo")),
         languages=languages,
-        elocation=elocations,
+        elocations=elocations,
     )
 
 
@@ -588,7 +587,7 @@ def _get_resource_info(resource_info_tag: Element | None) -> ResourceInfo | None
     resource_units: list[str] = [
         resource_unit_tag.text
         for resource_unit_tag in resource_info_tag.findall("ResourceUnit")
-        if resource_unit_tag.text
+        if resource_unit_tag.text is not None
     ]
 
     resource_tag = resource_info_tag.find("Resource")
@@ -625,6 +624,14 @@ CARRIER_TYPE_REPLACE = {
 }
 
 
+@overload
+def _replace(x: str, d: Mapping[str | None, str]) -> str: ...
+
+
+@overload
+def _replace(x: None, d: Mapping[str | None, str]) -> str | None: ...
+
+
 def _replace(x: str | None, d: Mapping[str | None, str]) -> str | None:
     return d.get(x, x)
 
@@ -639,12 +646,10 @@ def _process_other_id(tag: Element) -> Reference | None:
 def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
     if CATALOG_PROCESSED_GZ_PATH.is_file() and not force_process:
-        return list(_read_catalog(CATALOG_PROCESSED_GZ_PATH))
-
-    rv = list(iterate_process_catalog(force=force, force_process=force_process))
-    with gzip.open(CATALOG_PROCESSED_GZ_PATH, mode="wt") as file:
-        _dump_catalog(rv, file, indent=2)
-    return rv
+        return read_pydantic_json_list(CATALOG_PROCESSED_GZ_PATH, CatalogRecord)
+    catalog_records = list(iterate_process_catalog(force=force, force_process=force_process))
+    write_pydantic_json_list(catalog_records, CATALOG_PROCESSED_GZ_PATH)
+    return catalog_records
 
 
 def iterate_process_catalog(
@@ -688,7 +693,7 @@ def _parse_catalog(
 ) -> Iterable[CatalogRecord]:
     cache_path = path.with_suffix(".json.gz")
     if cache_path.is_file() and not force_process:
-        yield from _read_catalog(cache_path)
+        yield from read_pydantic_json_list(cache_path, CatalogRecord)
     else:
         try:
             tree = etree.parse(path)
@@ -706,29 +711,8 @@ def _parse_catalog(
             if catalog_record:
                 catalog_records.append(catalog_record)
 
-        with gzip.open(cache_path, mode="wt") as file:
-            _dump_catalog(catalog_records, file)
-
+        write_pydantic_json_list(catalog_records, cache_path)
         yield from catalog_records
-
-
-def _read_catalog(cache_path: Path) -> Iterable[CatalogRecord]:
-    with gzip.open(cache_path, mode="rt") as file:
-        for d in json.load(file):
-            yield CatalogRecord.model_validate(d)
-
-
-def _dump_catalog(catalog_records: list[CatalogRecord], file: TextIO, **kwargs: Any) -> None:
-    json.dump(
-        [
-            catalog_record.model_dump(exclude_none=True, exclude_defaults=True)
-            for catalog_record in catalog_records
-        ],
-        file,
-        default=_json_default,
-        **kwargs,
-        ensure_ascii=False,
-    )
 
 
 def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
