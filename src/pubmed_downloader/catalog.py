@@ -432,6 +432,35 @@ def _extract_title_related(tag: Element) -> TitleRelated | None:
     )
 
 
+#: Legacy english language codes that can't be mapped to ISO three-letter codes
+UNUSABLE_LEGACY_LANGUAGE_CODE = {
+    "cai",  # Central American Indian (Other)
+}
+# remap from ISO 639-2/B (legacy english codes)
+LEGACY_LANGUAGE_CODE_TO_STANDARD = {
+    "ger": "deu",
+    "cze": "ces",
+    "fre": "fra",
+    "dut": "nld",
+    "chi": "zho",
+    "slo": "slk",
+    "rum": "ron",
+    "mac": "mkd",
+    "gre": "ell",
+    "may": "msa",
+    "ice": "isl",
+    "per": "fas",
+    "alb": "sqi",
+    "arm": "hye",
+    "geo": "kat",
+    "wel": "cym",
+    "tib": "bod",
+    "baq": "eus",
+    "mao": "mri",
+    "bur": "mya",
+}
+
+
 def _extract_catalog_record(  # noqa:C901
     tag: Element,
     *,
@@ -481,18 +510,17 @@ def _extract_catalog_record(  # noqa:C901
 
     # <Language LangType="Primary">eng</Language>
     languages = [
-        Language(value=language_tag.text, type=language_tag.attrib["LangType"])
+        language
         for language_tag in tag.findall("Language")
+        if (language := _get_language(language_tag)) is not None
     ]
 
     publication_type_mesh_ids = sorted(
         # there are less than 30 instances of this data being broken where
         # the remove prefixes are necessary, but it has to be done
-        mesh_id.removeprefix("(uri) http://id.nlm.nih.gov/mesh/").removeprefix(
-            "http://id.nlm.nih.gov/mesh/"
-        )
+        mesh_id
         for publication_type_tag in tag.findall(".//PublicationTypeList/PublicationType")
-        if (mesh_id := _get_mesh_id(publication_type_tag))
+        if (mesh_id := _get_mesh_id(publication_type_tag)) is not None
     )
 
     mesh_headings = [
@@ -585,6 +613,20 @@ def _extract_catalog_record(  # noqa:C901
         resource_info=_get_resource_info(tag.find("ResourceInfo")),
         languages=languages,
         elocations=elocations,
+    )
+
+
+def _get_language(language_tag: Element) -> Language | None:
+    # legacy english bibliographic labels are used
+    iso_639_2b = language_tag.text
+    if iso_639_2b is None:
+        return None
+    iso_639_2b = iso_639_2b.strip().lower()
+    if iso_639_2b in UNUSABLE_LEGACY_LANGUAGE_CODE:
+        return None
+    return Language(
+        value=LEGACY_LANGUAGE_CODE_TO_STANDARD.get(iso_639_2b, iso_639_2b),
+        type=language_tag.attrib["LangType"],
     )
 
 
@@ -767,25 +809,36 @@ def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
     )
 
 
-def _iter_catpluslease_urls() -> Iterable[str]:
+def _iter_catpluslease_urls(*, refresh: bool = True) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     yield from _iter_catalog_urls(
         base="https://ftp.nlm.nih.gov/projects/catpluslease/",
         skip_prefix="catplusbase",
         include_prefix="catplus",
+        refresh=refresh,
     )
 
 
-def _iter_serfile_urls() -> Iterable[str]:
+def _iter_serfile_urls(*, refresh: bool = True) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     yield from _iter_catalog_urls(
         base="https://ftp.nlm.nih.gov/projects/serfilelease/",
         skip_prefix="serfilebase",
         include_prefix="serfile",
+        refresh=refresh,
     )
 
+def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str, *, refresh: bool = True) -> Iterable[str]:
+    path = MODULE.join(name=f"{include_prefix}-index.txt")
+    if path.is_file() and not refresh:
+        yield from path.readlines()
+    else:
+        urls = list(_iter_catalog_urls_helper(base, skip_prefix, include_prefix))
+        path.write_text("\n".join(urls))
+        yield from urls
 
-def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iterable[str]:
+
+def _iter_catalog_urls_helper(base: str, skip_prefix: str, include_prefix: str) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     res = requests.get(base, timeout=300)
     soup = BeautifulSoup(res.text, "html.parser")
@@ -822,6 +875,8 @@ def _main(force_process: bool) -> None:
     content_type_counter: Counter[str] = Counter()
     media_type_counter: Counter[str] = Counter()
     carrier_type_counter: Counter[str] = Counter()
+    status_counter: Counter[str] = Counter()
+    owner_counter: Counter[str] = Counter()
 
     records = process_catalog(force_process=force_process)
     click.echo(f"There are {len(records):,} catalog records")
@@ -831,14 +886,14 @@ def _main(force_process: bool) -> None:
             continue
         for pt in record.publication_type_mesh_ids:
             publication_type_counter[pt] += 1
-
         for imprint in record.imprints:
             imprint_type_counter[imprint.type] += 1
-
         for lang in record.languages:
             language_counter[lang.value] += 1
             language_type_counter[lang.type] += 1
 
+        status_counter[record.status] += 1
+        owner_counter[record.owner] += 1
         type_counter[resource_info.type] += 1
         issuance_counter[resource_info.issuance] += 1
         for resource_unit in resource_info.resource_units:
@@ -847,6 +902,12 @@ def _main(force_process: bool) -> None:
             content_type_counter[resource_info.resource.content_type] += 1
             media_type_counter[resource_info.resource.media_type] += 1
             carrier_type_counter[resource_info.resource.carrier_type] += 1
+
+    click.secho("\nPublication Status Counter", fg="blue")
+    click.echo(tabulate(status_counter.most_common()))
+
+    click.secho("\nPublication Owner Counter", fg="blue")
+    click.echo(tabulate(owner_counter.most_common()))
 
     click.secho("\nPublication Type Counter", fg="blue")
     click.echo(tabulate(publication_type_counter.most_common()))
