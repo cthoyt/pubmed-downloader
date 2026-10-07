@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import datetime
 import itertools as itt
 from collections.abc import Iterable, Mapping
@@ -14,7 +13,7 @@ import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import NamableReference, Reference
+from curies import NamableReference, NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
 from pydantic_extra_types.language_code import ISO639_3
@@ -37,44 +36,69 @@ from .utils import (
 
 __all__ = [
     "CatalogRecord",
+    "Journal",
     "ensure_catalog_provider_links",
     "ensure_catfile_catalog",
+    "ensure_j_entrez",
+    "ensure_j_medline",
     "ensure_journal_overview",
     "ensure_serfile_catalog",
+    "get_catalog_to_publisher",
+    "get_journals",
     "process_catalog",
-    "process_catalog_provider_links",
     "process_journal_overview",
 ]
 
 CATALOG_TO_PUBLISHER = "https://ftp.ncbi.nlm.nih.gov/pubmed/xmlprovidernames.txt"
+
+# It appears that J_Entrez and J_Medline have the same data model -
+# they both have explicit synonym types for MEDLINE and ISO annotations,
+# but doesn't include start and end years. The jourcache.xml has start
+# and end years, but doesn't annotate its synonym types
 JOURNAL_INFO_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/jourcache.xml"
-J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
+# The same content as J_Medline.txt plus NCBI molecular biology database journals
+J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 
 CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.jsonl.gz")
 
+START_YEAR_FIXES: dict[str | None, str] = {"9918265998706676": "1992"}
 
-class Journal(BaseModel):
-    """Represents a journal (a subset of NLM Catalog Records)."""
+
+def ensure_j_medline(*, force: bool = False) -> Path:
+    """Ensure the overview file for PubMed/MEDLINE journals is downloaded."""
+    return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
+
+
+def ensure_j_entrez(*, force: bool = False) -> Path:
+    """Ensure the overview file for PubMed/MEDLINE extended with NCBI molecular biology database journals is downloaded."""  # noqa:E501
+    return MODULE.ensure(url=J_ENTREZ_PATH, force=force)
+
+
+class JournalShort(BaseModel):
+    """Represents records in the J_Entrez and J_medline files."""
 
     id: int
-    nlm_catalog_id: str = Field(
-        ...,
-        description="The identifier for the journal in the NLM Catalog (https://www.ncbi.nlm.nih.gov/nlmcatalog)",
-    )
+    nlm_catalog_id: str
     title: str
+    issns: list[ISSN] = Field(default_factory=list)
     abbreviation_medline: str | None = None
     abbreviation_iso: str | None = None
-    issns: list[ISSN] = Field(default_factory=list)
-    synonyms: list[str] = Field(default_factory=list)
-    active: bool = True
-    start_year: int | None
-    end_year: int | None
 
     @property
     def nlm_catalog_url(self) -> str:
         """Get the NLM Catalog URL."""
         return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
+
+
+class Journal(JournalShort):
+    """Represents a journal (a subset of NLM Catalog Records)."""
+
+    synonyms: list[str] = Field(default_factory=list)
+    active: bool = True
+    start_year: int | None = None
+    end_year: int | None = None
+    publisher: NamedReference | None = None
 
 
 #: A remapping from internal journal keys to :class:`Journal` field names
@@ -87,7 +111,9 @@ REMAPPING = {
 }
 
 
-def process_journal_overview(*, force: bool = False, include_entrez: bool = True) -> list[Journal]:
+def process_journal_overview(
+    *, force: bool = False, include_entrez: bool = True
+) -> list[JournalShort]:
     """Get the list of journals appearing in PubMed/MEDLINE.
 
     :param force: Should the data be re-downloaded?
@@ -115,7 +141,7 @@ def ensure_journal_overview(*, force: bool = False, include_entrez: bool = True)
         return MODULE.ensure(url=J_MEDLINE_PATH, force=force)
 
 
-def _parse_journals(path: Path) -> Iterable[Journal]:
+def _parse_journals(path: Path) -> Iterable[JournalShort]:
     with path.open() as file:
         for is_delimiter, lines in itt.groupby(file, key=lambda line: line.startswith("---")):
             if is_delimiter:
@@ -135,30 +161,24 @@ def _parse_journals(path: Path) -> Iterable[Journal]:
                 else:
                     data[REMAPPING[key]] = value
 
-            yield Journal.model_validate(data)
+            yield JournalShort.model_validate(data, extra="forbid")
 
 
-class CatalogProviderLink(BaseModel):
-    """Represents a link between a NLM Catalog record and its provider."""
-
-    nlm_catalog_id: str
-    key: str = Field(..., description="Key for the NLM provider, corresponding to ")
-    label: str
-
-    @property
-    def nlm_catalog_url(self) -> str:
-        """Get the NLM Catalog URL."""
-        return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
-
-
-def process_catalog_provider_links(*, force: bool = False) -> list[CatalogProviderLink]:
-    """Ensure and process catalog record - provider links file."""
+def get_catalog_to_publisher(*, force: bool = False) -> dict[str, NamedReference]:
+    """Get a mapping from NLM Catalog identifier to NLM publisher reference."""
     path = ensure_catalog_provider_links(force=force)
+    rv = {}
     with path.open() as file:
-        return [
-            CatalogProviderLink(nlm_catalog_id=nlm_catalog_id, key=key, label=name)
-            for nlm_catalog_id, key, name in csv.reader(file, delimiter="|")
-        ]
+        for i, line in enumerate(file, start=1):
+            try:
+                catalog_id, publisher_id, publisher_name = line.strip().split("|")
+            except ValueError:
+                tqdm.write(f"failed on line {i}: {line}")
+                continue
+            rv[catalog_id] = NamedReference(
+                prefix="nlm.publisher", identifier=publisher_id, name=publisher_name
+            )
+    return rv
 
 
 def ensure_catalog_provider_links(*, force: bool = False) -> Path:
@@ -166,24 +186,47 @@ def ensure_catalog_provider_links(*, force: bool = False) -> Path:
     return MODULE.ensure(url=CATALOG_TO_PUBLISHER, force=force)
 
 
-def _iterate_journals(*, force: bool = False) -> Iterable[Journal]:
-    process_journal_overview(force=force)
-    process_catalog_provider_links(force=force)
+def get_journals(*, force: bool = False, progress: bool = True) -> list[Journal]:
+    """Get the list of journals appearing in PubMed/MEDLINE.
+
+    :param force: Should the data be re-downloaded?
+    :returns: A list of journal objects parsed from the overview file
+    """
+    return list(_iterate_journals(force=force, progress=progress))
+
+
+def _iterate_journals(*, force: bool = False, progress: bool = True) -> Iterable[Journal]:
+    """Iterate over journals."""
+    overview_summary = {
+        journal.nlm_catalog_id: journal for journal in _parse_journals(ensure_j_entrez(force=force))
+    }
+
+    catalog_to_publisher = get_catalog_to_publisher(force=force)
 
     path = MODULE.ensure(url=JOURNAL_INFO_PATH, force=force)
     root = etree.parse(path).getroot()
 
     elements = root.findall("Journal")
-    for element in elements:
-        journal = _process_journal(element)
-        if journal:
+    for element in tqdm(elements, disable=not progress, leave=False):
+        if journal := _process_journal(
+            element, overview_summary, catalog_to_publisher=catalog_to_publisher
+        ):
             yield journal
 
 
-def _process_journal(element: Element) -> Journal | None:
+def _process_journal(
+    element: Element,
+    journal_short_info: dict[str, JournalShort],
+    catalog_to_publisher: dict[str, NamedReference],
+) -> Journal | None:
     jrid = element.attrib["jrid"]
 
     nlm_catalog_id = element.findtext("NlmUniqueID")
+    if nlm_catalog_id is None:
+        raise ValueError("no NLM catalog ID")
+
+    extra_info = journal_short_info.get(nlm_catalog_id)
+
     title = element.findtext("Name")
     issns = [
         ISSN(value=issn_tag.text, type=issn_tag.attrib["type"].capitalize())
@@ -196,24 +239,30 @@ def _process_journal(element: Element) -> Journal | None:
             active = True
         case _ as v:
             raise ValueError(f"unknown activity value: {v}")
-    synonyms = [alias_tag.text for alias_tag in element.findall("Alias")]
+    synonyms = {alias_tag.text for alias_tag in element.findall("Alias")}
+    if extra_info is not None:
+        synonyms.discard(extra_info.abbreviation_iso)
+        synonyms.discard(extra_info.abbreviation_medline)
     if (start_year := element.findtext("StartYear")) and len(start_year) != 4:
-        tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
-        start_year = None
+        if nlm_catalog_id in START_YEAR_FIXES:
+            start_year = START_YEAR_FIXES[nlm_catalog_id]
+        else:
+            tqdm.write(f"[{nlm_catalog_id}] - invalid start year: {start_year}")
     if (end_year := element.findtext("EndYear")) and len(end_year) != 4:
-        tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
+        tqdm.write(f"[{nlm_catalog_id}] - invalid end year: {end_year}")
         end_year = None
-
-    # TODO abbreviations?
     return Journal(
         id=jrid,
         title=title,
         nlm_catalog_id=nlm_catalog_id,
         active=active,
+        abbreviation_iso=extra_info and extra_info.abbreviation_iso,
+        abbreviation_medline=extra_info and extra_info.abbreviation_medline,
         start_year=start_year,
         end_year=end_year,
         issns=issns,
         synonyms=synonyms,
+        publisher=catalog_to_publisher.get(nlm_catalog_id),
     )
 
 
