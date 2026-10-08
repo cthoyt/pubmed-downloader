@@ -192,7 +192,7 @@ class Article(BaseModel):
         for type_mesh_id in self.type_mesh_ids:
             yield v.rdf_type, Reference(prefix="mesh", identifier=type_mesh_id)
         for heading in self.headings:
-            yield HAS_TOPIC, Reference(prefix="mesh", identifier=heading.mesh_id)
+            yield HAS_TOPIC, heading.reference
         yield IN_JOURNAL, Reference(prefix="nlm", identifier=self.journal.nlm_catalog_id)
         for author in self.authors:
             match author:
