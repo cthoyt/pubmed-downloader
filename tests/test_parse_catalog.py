@@ -30,7 +30,10 @@ def get_mock_grounder(lookup: dict[str, NamableReference]) -> Grounder:
     """Get a grounder from a lookup."""
 
     class MockGrounder(EmptyGrounder):
+        """A mock grounder."""
+
         def get_matches(self, text: str, *, strict: bool = False, **kwargs: Any) -> list[Match]:
+            """Get mathces."""
             reference = lookup.get(text)
             if reference is not None:
                 return [Match(reference=reference, score=1)]
