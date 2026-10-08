@@ -946,7 +946,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:  # noqa:C901
     imprint_type_counter: Counter[str] = Counter()
     imprint_count_counter: Counter[int] = Counter()
     imprint_place_counter: Counter[str] = Counter()
-    imprint_counter: Counter[tuple[str, bool]] = Counter()
+    imprint_counter: Counter[tuple[str, str | None]] = Counter()
     language_counter: Counter[tuple[str, str]] = Counter()
     language_type_counter: Counter[str] = Counter()
     type_counter: Counter[str] = Counter()
@@ -971,7 +971,10 @@ def _main(force_process: bool, refresh_index: bool) -> None:  # noqa:C901
             heading_counter[heading.reference.identifier, heading.reference.name] += 1
 
         for imprint in record.imprints:
-            imprint_counter[imprint.name or "none", imprint.reference is not None] += 1
+            imprint_counter[
+                imprint.name or "none",
+                imprint.reference.identifier if imprint.reference is not None else None,
+            ] += 1
             imprint_place_counter[imprint.place or "none"] += 1
             imprint_type_counter[imprint.type or "none"] += 1
 
@@ -1001,7 +1004,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:  # noqa:C901
     _tabulate(status_counter, "Publication Status")
     _tabulate(owner_counter, "Publication Owner")
     _tabulate(publication_type_counter, "MeSH", "Publication Type")
-    _tabulate(imprint_counter, "Imprint", "Grounded?", n=50)
+    _tabulate(imprint_counter, "Imprint", "ROR", n=50)
     _tabulate(imprint_place_counter, "Imprint Place", n=50)
     _tabulate(imprint_type_counter, "Imprint Type")
     _tabulate(imprint_count_counter, "Imprint Arity")
