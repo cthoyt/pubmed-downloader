@@ -997,7 +997,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:  # noqa:C901
             click.secho(f"showing top {n}", fg="yellow")
         click.echo(tabulate_counter(counter, n=n, headers=[*headers, "Count"], tablefmt="github"))
 
-    _tabulate(heading_counter, "MeSH", "Heading")
+    _tabulate(heading_counter, "MeSH", "Heading", n=50)
     _tabulate(status_counter, "Publication Status")
     _tabulate(owner_counter, "Publication Owner")
     _tabulate(publication_type_counter, "MeSH", "Publication Type")
