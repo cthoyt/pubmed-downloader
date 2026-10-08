@@ -362,19 +362,19 @@ MESH_RDF_URI_PREFIX = "https://id.nlm.nih.gov/mesh/"
 
 
 def _ground_mesh(
-    descriptor_name_tag: Element,
+    element: Element,
     *,
     matcher: ssslm.Matcher | None = None,
     mesh_heading_tag: Element | None = None,
 ) -> NamableReference | None:
-    if "UI" in descriptor_name_tag.attrib:
-        mesh_id = descriptor_name_tag.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
-    elif "URI" in descriptor_name_tag.attrib:
-        mesh_id = descriptor_name_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    if "UI" in element.attrib:
+        mesh_id = element.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
+    elif "URI" in element.attrib:
+        mesh_id = element.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
     elif mesh_heading_tag is not None and "URI" in mesh_heading_tag.attrib:
         mesh_id = mesh_heading_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
-    elif descriptor_name_tag.text is not None and matcher is not None:
-        if match := matcher.get_best_match(descriptor_name_tag.text):
+    elif element.text is not None and matcher is not None:
+        if match := matcher.get_best_match(element.text):
             return match.reference
         return None
     else:
@@ -384,7 +384,18 @@ def _ground_mesh(
         .removeprefix("http://id.nlm.nih.gov/mesh/")
         .removeprefix("(DNLM)")
     )
-    return NamableReference(prefix="mesh", identifier=mesh_id, name=descriptor_name_tag.text)
+    mesh_id, _, _qualifier = mesh_id.partition("Q")
+    # TODO pass qualifiers around? the issue is if there are
+    #  multiple qualifiers like in 20191201.xml example below,
+    #  they dont all get put into the URI
+    """
+    <MeshHeading URI="https://id.nlm.nih.gov/mesh/D000820Q000453">
+        <DescriptorName MajorTopicYN="N">Animal Diseases</DescriptorName>
+        <QualifierName MajorTopicYN="N">epidemiology</QualifierName>
+        <QualifierName MajorTopicYN="N">prevention &amp; control</QualifierName>
+    </MeshHeading>
+    """
+    return NamableReference(prefix="mesh", identifier=mesh_id, name=element.text)
 
 
 def _parse_yn(s: str) -> bool:
