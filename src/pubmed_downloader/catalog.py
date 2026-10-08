@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import csv
 import datetime
-import gzip
 import itertools as itt
-import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Literal, TextIO
+from typing import Any, Literal, TypeAlias, cast, overload
 from xml.etree.ElementTree import Element
 
 import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import Reference
+from curies import NamableReference, NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
+from pydantic_extra_types.language_code import ISO639_3, _index_by_alpha3
+from pystow.utils import iter_pydantic_jsonl, read_pydantic_jsonl, write_pydantic_jsonl
+from ssslm import Grounder
 from tqdm import tqdm
 from tqdm.contrib.concurrent import thread_map
 
@@ -28,8 +29,7 @@ from .utils import (
     Author,
     Collective,
     Heading,
-    _get_mesh_id,
-    _json_default,
+    _ground_mesh,
     parse_author,
     parse_date,
     parse_mesh_heading,
@@ -51,7 +51,7 @@ JOURNAL_INFO_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/jourcache.xml"
 J_ENTREZ_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Entrez.txt"
 J_MEDLINE_PATH = "https://ftp.ncbi.nlm.nih.gov/pubmed/J_Medline.txt"
 
-CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.json.gz")
+CATALOG_PROCESSED_GZ_PATH = MODULE.join(name="catalog.jsonl.gz")
 
 
 class Journal(BaseModel):
@@ -197,14 +197,12 @@ def _process_journal(element: Element) -> Journal | None:
         case _ as v:
             raise ValueError(f"unknown activity value: {v}")
     synonyms = [alias_tag.text for alias_tag in element.findall("Alias")]
-    if start_year := element.findtext("StartYear"):
-        if len(start_year) != 4:
-            tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
-            start_year = None
-    if end_year := element.findtext("EndYear"):
-        if len(end_year) != 4:
-            tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
-            end_year = None
+    if (start_year := element.findtext("StartYear")) and len(start_year) != 4:
+        tqdm.write(f"[{nlm_catalog_id}] invalid start year: {start_year}")
+        start_year = None
+    if (end_year := element.findtext("EndYear")) and len(end_year) != 4:
+        tqdm.write(f"[{nlm_catalog_id}] invalid end year: {end_year}")
+        end_year = None
 
     # TODO abbreviations?
     return Journal(
@@ -227,12 +225,23 @@ class Resource(BaseModel):
     carrier_type: str
 
 
+ResourceType: TypeAlias = Literal[
+    "Serial",
+    "Nonmusical Sound Recording",
+    "Visual Material",
+    "Electronic Resource",
+    "Kit",
+    "Book",
+    "Map",
+    "Still Image",
+]
+
+
 class ResourceInfo(BaseModel):
     """Represents a resource info annotation to a catalog record."""
 
-    type: str
-    # issuance only ever has one value: "continuing"
-    issuance: str
+    type: ResourceType
+    issuance: Literal["continuing"]
     resource_units: list[str]
     resource: Resource | None = None
 
@@ -240,20 +249,30 @@ class ResourceInfo(BaseModel):
 class Imprint(BaseModel):
     """Represents an imprint, which is like a brand for a publisher."""
 
-    type: str | None = None
+    type: Literal["Original", "Current"] | None = None
     function_type: str | None = None
     place: str | None = None
-    entity: str | None = None
+    name: str | None = None
+    reference: NamableReference | None = None
+    date_issued: str | None = None  # TODO parse in start/end?
 
 
 class Language(BaseModel):
     """Represents a language and its usage annotation."""
 
-    # TODO is this supposed to be standardized with ISO 3-letter?
-    value: str
-    # this doesn't really make sense, it's one of Primary, Summary,
-    # TableOfContents, Original, or Captions
-    type: str
+    alpha3: ISO639_3
+
+    # this doesn't really make sense
+    type: Literal["Primary", "Summary", "TableOfContents", "Original", "Captions"]
+
+    @property
+    def name(self) -> str:
+        """Get the language name."""
+        return _index_by_alpha3()[self.alpha3].name
+
+    def get_reference(self) -> Reference:
+        """Get a reference."""
+        return Reference(prefix="iso.639-3", identifier=self.alpha3)
 
 
 class TitleAlternative(BaseModel):
@@ -277,17 +296,40 @@ class TitleRelated(BaseModel):
     xrefs: list[Reference] = Field(default_factory=list)
 
 
+CatalogStatus: TypeAlias = Literal[
+    "Completed",  # 553,846
+    "Not-Our-Cataloging",  # 176,796
+    "Withdrawn",  # 25,321
+    "In-Process",  # 5,359
+    "On-Order",  # 569
+    "Brief",  # 133
+    "Undetermined",  # 22
+]
+
+CatalogOwner: TypeAlias = Literal[
+    "NLM",  # 762,024
+    "Undetermined",  # 22
+]
+
+PERIODICAL = NamedReference(prefix="mesh", identifier="D020492", name="Periodical")
+CONFERENCE_PROCEEDINGS = NamedReference(
+    prefix="mesh", identifier="D016423", name="Conference Proceedings"
+)
+
+
 class CatalogRecord(BaseModel):
     """Represents a record in the NLM Catalog."""
 
     nlm_catalog_id: str
+    owner: CatalogOwner
+    status: CatalogStatus
     title: str
     title_sort: Literal["N"] | int
     medline_short_title: str | None = None
     title_alternatives: list[TitleAlternative] = Field(default_factory=list)
     title_relatives: list[TitleRelated] = Field(default_factory=list)
-    publication_type_mesh_ids: list[str] = Field(default_factory=list)
-    mesh_headings: list[Heading] = Field(default_factory=list)
+    publication_types: list[NamableReference] = Field(default_factory=list)
+    headings: list[Heading] = Field(default_factory=list)
     date_created: datetime.date | None = None
     date_revised: datetime.date | None = None
     date_authorized: datetime.date | None = None
@@ -310,6 +352,16 @@ class CatalogRecord(BaseModel):
         """Get the NLM Catalog URL."""
         return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
 
+    @property
+    def is_periodical(self) -> bool:
+        """Check if this catalog record is a periodical (i.e., a journal)."""
+        return PERIODICAL in self.publication_types
+
+    @property
+    def is_conference_proceedings(self) -> bool:
+        """Check if this catalog record is a conference proceedings."""
+        return CONFERENCE_PROCEEDINGS in self.publication_types
+
 
 def _process_elocation_tag(elt: Element) -> str | None:
     if elt.attrib["EIdType"] != "url":
@@ -324,26 +376,26 @@ def _extract_alts(tag: Element) -> list[TitleAlternative]:
     # <TitleAlternate Owner="NLM" TitleType="Other">
     #     <Title Sort="N">Physiology, biochemistry and pharmacology</Title>
     # </TitleAlternate>
-    rv = []
-    for outer_tag in tag.findall("TitleAlternate"):
-        inner_tag = outer_tag.find("Title")
-        if inner_tag is None:
-            continue
+    return [
+        title_alternate
+        for title_alternate_tag in tag.findall("TitleAlternate")
+        if (title_alternate := _extract_alt(title_alternate_tag)) is not None
+    ]
 
-        title_type = outer_tag.attrib["TitleType"]
-        title_source = outer_tag.attrib["Owner"]
-        title_text = inner_tag.text
-        title_sort = inner_tag.attrib["Sort"]
 
-        rv.append(
-            TitleAlternative(
-                text=title_text,
-                source=title_source,
-                type=title_type,
-                sort=title_sort,
-            )
-        )
-    return rv
+def _extract_alt(outer_tag: Element) -> TitleAlternative | None:
+    inner_tag = outer_tag.find("Title")
+    if inner_tag is None:
+        return None
+    title_text = inner_tag.text
+    if not isinstance(title_text, str) or not title_text:
+        return None
+    return TitleAlternative(
+        text=title_text,
+        source=outer_tag.attrib["Owner"],
+        type=outer_tag.attrib["TitleType"],
+        sort=inner_tag.attrib["Sort"],
+    )
 
 
 def _extract_rels(tag: Element) -> list[TitleRelated]:
@@ -353,36 +405,82 @@ def _extract_rels(tag: Element) -> list[TitleRelated]:
     #     <RecordID Source="OCLC">1778955</RecordID>
     #     <ISSN IssnType="Undetermined">0169-8028</ISSN>
     # </TitleRelated>
-    rv = []
-    for outer_tag in tag.findall("TitleRelated"):
-        inner_tag = outer_tag.find("Title")
-        if inner_tag is None:
+    return [
+        title_related
+        for title_related_tag in tag.findall("TitleRelated")
+        if (title_related := _extract_title_related(title_related_tag)) is not None
+    ]
+
+
+def _extract_title_related(tag: Element) -> TitleRelated | None:
+    inner_tag = tag.find("Title")
+    if inner_tag is None:
+        return None
+
+    if inner_tag.text is None:
+        raise ValueError
+
+    title_type = tag.attrib["TitleType"]
+    title_source = tag.attrib["Owner"]
+    title_sort = inner_tag.attrib["Sort"]
+
+    issns = [
+        ISSN(value=issn_tag.text.replace(" ", ""), type=issn_type.replace(" ", ""))
+        for issn_tag in tag.findall("ISSN")
+        if issn_tag.text is not None and (issn_type := issn_tag.attrib.get("IssnType")) is not None
+    ]
+    xrefs = []
+    for record_id_tag in tag.findall("RecordID"):
+        if record_id_tag.text is None:
             continue
+        prefix = record_id_tag.attrib["Source"]
+        try:
+            # look into LC and sn 97039260
+            xref = Reference(prefix=prefix, identifier=record_id_tag.text.replace(" ", ""))
+        except ValueError:
+            tqdm.write(f"failed to extract xref from {prefix} and {record_id_tag.text}")
+        else:
+            xrefs.append(xref)
 
-        title_type = outer_tag.attrib["TitleType"]
-        title_source = outer_tag.attrib["Owner"]
-        title_text = inner_tag.text
-        title_sort = inner_tag.attrib["Sort"]
+    return TitleRelated(
+        text=inner_tag.text,
+        source=title_source,
+        type=title_type,
+        sort=title_sort,
+        issns=issns,
+        xrefs=xrefs,
+    )
 
-        issns = [
-            ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
-            for issn_tag in outer_tag.findall("ISSN")
-        ]
-        xrefs = [
-            Reference(prefix=t.attrib["Source"], identifier=t.text)
-            for t in outer_tag.findall("RecordID")
-        ]
-        rv.append(
-            TitleRelated(
-                text=title_text,
-                source=title_source,
-                type=title_type,
-                sort=title_sort,
-                issns=issns,
-                xrefs=xrefs,
-            )
-        )
-    return rv
+
+#: Legacy english language codes that can't be mapped to ISO three-letter codes
+UNUSABLE_LEGACY_LANGUAGE_CODE = {
+    "cai",  # Central American Indian (Other)
+}
+# remap from ISO 639-2/B (legacy english codes)
+LEGACY_LANGUAGE_CODE_TO_STANDARD = {
+    "ger": "deu",
+    "cze": "ces",
+    "fre": "fra",
+    "dut": "nld",
+    "chi": "zho",
+    "slo": "slk",
+    "rum": "ron",
+    "mac": "mkd",
+    "gre": "ell",
+    "may": "msa",
+    "ice": "isl",
+    "per": "fas",
+    "alb": "sqi",
+    "arm": "hye",
+    "geo": "kat",
+    "wel": "cym",
+    "tib": "bod",
+    "baq": "eus",
+    "mao": "mri",
+    "bur": "mya",
+}
+
+ENTITY_MISSES: set[str] = set()
 
 
 def _extract_catalog_record(  # noqa:C901
@@ -413,46 +511,51 @@ def _extract_catalog_record(  # noqa:C901
     alts = _extract_alts(tag)
     rels = _extract_rels(tag)
 
+    owner = tag.attrib["Owner"]
+    status = tag.attrib["Status"]
+
     # TODO PhysicalDescription
 
     # <ELocationList>
-    #         <ELocation>
-    #             <ELocationID EIdType="url" ValidYN="Y">http://www.psychologicabelgica.com/</ELocationID>
-    #         </ELocation>
-    #         <ELocation>
-    #             <ELocationID EIdType="url" ValidYN="Y">https://www.ncbi.nlm.nih.gov/pmc/journals/3396/</ELocationID>
-    #         </ELocation>
-    #     </ELocationList>
+    #     <ELocation>
+    #         <ELocationID EIdType="url" ValidYN="Y">http://www.psychologicabelgica.com/</ELocationID>
+    #     </ELocation>
+    #     <ELocation>
+    #         <ELocationID EIdType="url" ValidYN="Y">https://www.ncbi.nlm.nih.gov/pmc/journals/3396/</ELocationID>
+    #     </ELocation>
+    # </ELocationList>
     elocations = [
         url
-        for x in tag.findall(".//ELocationList/ELocation/ELocationID")
-        if (url := _process_elocation_tag(x))
+        for elocation_id_tag in tag.findall(".//ELocationList/ELocation/ELocationID")
+        if (url := _process_elocation_tag(elocation_id_tag)) is not None
     ]
 
     # <Language LangType="Primary">eng</Language>
-    languages = [Language(value=x.text, type=x.attrib["LangType"]) for x in tag.findall("Language")]
+    languages = [
+        language
+        for language_tag in tag.findall("Language")
+        if (language := _get_language(language_tag)) is not None
+    ]
 
-    publication_type_mesh_ids = sorted(
-        # there are less than 30 instances of this data being broken where
-        # the remove prefixes are necessary, but it has to be done
-        mesh_id.removeprefix("(uri) http://id.nlm.nih.gov/mesh/").removeprefix(
-            "http://id.nlm.nih.gov/mesh/"
-        )
+    publication_types = sorted(
+        mesh_reference
         for publication_type_tag in tag.findall(".//PublicationTypeList/PublicationType")
-        if (mesh_id := _get_mesh_id(publication_type_tag))
+        if (mesh_reference := _ground_mesh(publication_type_tag, matcher=mesh_grounder)) is not None
     )
 
-    mesh_headings = [
+    headings = [
         heading
-        for x in tag.findall(".//MeshHeadingList/MeshHeading")
-        if (heading := parse_mesh_heading(x, mesh_grounder=mesh_grounder))
+        for heading_tag in tag.findall(".//MeshHeadingList/MeshHeading")
+        if (heading := parse_mesh_heading(heading_tag, mesh_grounder=mesh_grounder)) is not None
     ]
 
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
 
     authors, collectives = [], []
-    for i, x in enumerate(tag.findall(".//AuthorList/Author"), start=1):
-        match parse_author(i, x, ror_grounder=ror_grounder, author_grounder=author_grounder):
+    for i, author_tag in enumerate(tag.findall(".//AuthorList/Author"), start=1):
+        match parse_author(
+            i, author_tag, ror_grounder=ror_grounder, author_grounder=author_grounder
+        ):
             case Author() as author:
                 authors.append(author)
             case Collective() as collective:
@@ -461,6 +564,11 @@ def _extract_catalog_record(  # noqa:C901
     publication_info_tag = tag.find("PublicationInfo")
     start_year = None
     end_year = None
+
+    # there are only 70 that have more than one across the whole database,
+    # so for simplicity, we drop the second on all of those by prioritizing
+    # by ImprintType="Current"
+    imprints: list[Imprint] = []
     if publication_info_tag is not None:
         start_year_ = publication_info_tag.findtext("PublicationFirstYear")
         if start_year_ and len(start_year_) == 4 and start_year_.isnumeric():
@@ -470,24 +578,10 @@ def _extract_catalog_record(  # noqa:C901
             end_year = int(end_year_)
         if end_year == 9999:
             end_year = None
-        # TODO More information about publisher available here
-
-        imprints = []
-        for imprint_tag in publication_info_tag.findall("Imprint"):
-            # also Place, DateIssued, and ImprintFull
-            entity_tag = imprint_tag.find("Entity")
-            if entity_tag is not None and entity_tag.text:
-                entity = entity_tag.text.strip().strip(",").strip()
-            else:
-                entity = None
-            imprints.append(
-                Imprint(
-                    entity=entity,
-                    place=imprint_tag.findtext("Place"),
-                    type=imprint_tag.attrib.get("ImprintType"),
-                    function_type=imprint_tag.attrib.get("FunctionType"),
-                )
-            )
+        imprints.extend(
+            _get_imprint(imprint_tag, ror_grounder=ror_grounder)
+            for imprint_tag in publication_info_tag.findall("Imprint")
+        )
 
     issns = [
         ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
@@ -506,13 +600,15 @@ def _extract_catalog_record(  # noqa:C901
 
     return CatalogRecord(
         nlm_catalog_id=nlm_catalog_id,
+        owner=owner,
+        status=status,
         title=title.rstrip("."),
         title_sort=title_sort,
         title_alternatives=alts,
         title_relatives=rels,
         medline_short_title=tag.findtext("MedlineTA"),
-        publication_type_mesh_ids=publication_type_mesh_ids,
-        mesh_headings=mesh_headings,
+        publication_types=publication_types,
+        headings=headings,
         date_created=parse_date(tag.find("DateCreated")),
         date_revised=parse_date(tag.find("DateRevised")),
         date_authorized=parse_date(tag.find("DateAuthorized")),
@@ -528,7 +624,58 @@ def _extract_catalog_record(  # noqa:C901
         collectives=collectives,
         resource_info=_get_resource_info(tag.find("ResourceInfo")),
         languages=languages,
-        elocation=elocations,
+        elocations=elocations,
+    )
+
+
+def _get_imprint(imprint_tag: Element, ror_grounder: ssslm.Grounder) -> Imprint:
+    """Extract information from an imprint.
+
+    .. code-block:: xml
+
+        <Imprint ImprintType="Original" FunctionType="Publication">
+            <Place>Thousand Oaks, CA :</Place>
+            <Entity>SAGE Publishing,</Entity>
+            <DateIssued>[2023]-</DateIssued>
+            <ImprintFull>Thousand Oaks, CA : SAGE Publishing, [2023]-</ImprintFull>
+        </Imprint>
+    """
+    # TODO DateIssued (which might be a range?)
+    entity_tag = imprint_tag.find("Entity")
+    if entity_tag is not None and entity_tag.text:
+        entity_name = entity_tag.text.strip().strip(",").strip()
+        entity_match = ror_grounder.get_best_match(entity_name)
+    else:
+        entity_name = None
+        entity_match = None
+
+    place_tag = imprint_tag.find("Place")
+    if place_tag is not None and place_tag.text:
+        place = place_tag.text.strip().lstrip("[").rstrip(": ,.]")
+    else:
+        place = None
+
+    return Imprint(
+        name=entity_name,
+        reference=entity_match.reference if entity_match else None,
+        place=place,
+        type=imprint_tag.attrib.get("ImprintType"),
+        function_type=imprint_tag.attrib.get("FunctionType"),
+        date_issued=imprint_tag.findtext("DateIssued"),
+    )
+
+
+def _get_language(language_tag: Element) -> Language | None:
+    # legacy english bibliographic labels are used
+    iso_639_2b = language_tag.text
+    if iso_639_2b is None:
+        return None
+    iso_639_2b = iso_639_2b.strip().lower()
+    if iso_639_2b in UNUSABLE_LEGACY_LANGUAGE_CODE:
+        return None
+    return Language(
+        alpha3=LEGACY_LANGUAGE_CODE_TO_STANDARD.get(iso_639_2b, iso_639_2b),
+        type=language_tag.attrib["LangType"],
     )
 
 
@@ -559,7 +706,7 @@ def _get_resource_info(resource_info_tag: Element | None) -> ResourceInfo | None
     resource_units: list[str] = [
         resource_unit_tag.text
         for resource_unit_tag in resource_info_tag.findall("ResourceUnit")
-        if resource_unit_tag.text
+        if resource_unit_tag.text is not None
     ]
 
     resource_tag = resource_info_tag.find("Resource")
@@ -596,57 +743,75 @@ CARRIER_TYPE_REPLACE = {
 }
 
 
+@overload
+def _replace(x: str, d: Mapping[str | None, str]) -> str: ...
+
+
+@overload
+def _replace(x: None, d: Mapping[str | None, str]) -> str | None: ...
+
+
 def _replace(x: str | None, d: Mapping[str | None, str]) -> str | None:
     return d.get(x, x)
 
 
 def _process_other_id(tag: Element) -> Reference | None:
-    prefix = tag.attrib["Prefix"].lstrip("(").rstrip(")")
-    # attrib also has 'Source',
+    prefix = tag.attrib.get("Prefix")
     identifier = tag.text
+    if prefix is None or identifier is None:
+        return None
+    prefix = prefix.strip().lstrip("(").rstrip(")").strip()
+    identifier = identifier.strip()
+    # TODO attrib also has 'Source',
     return Reference(prefix=prefix, identifier=identifier)
 
 
-def process_catalog(*, force: bool = False, force_process: bool = False) -> list[CatalogRecord]:
+def process_catalog(
+    *, force_process: bool = False, refresh_index: bool = True
+) -> list[CatalogRecord]:
     """Ensure and process the NLM Catalog."""
     if CATALOG_PROCESSED_GZ_PATH.is_file() and not force_process:
-        return list(_read_catalog(CATALOG_PROCESSED_GZ_PATH))
-
-    rv = list(iterate_process_catalog(force=force, force_process=force_process))
-    with gzip.open(CATALOG_PROCESSED_GZ_PATH, mode="wt") as file:
-        _dump_catalog(rv, file, indent=2)
-    return rv
+        return read_pydantic_jsonl(CATALOG_PROCESSED_GZ_PATH, CatalogRecord)
+    catalog_records = list(
+        iterate_process_catalog(force_process=force_process, refresh_index=refresh_index)
+    )
+    write_pydantic_jsonl(catalog_records, CATALOG_PROCESSED_GZ_PATH)
+    return catalog_records
 
 
 def iterate_process_catalog(
-    *, force: bool = False, force_process: bool = False
+    *, force_process: bool = False, refresh_index: bool = True
 ) -> Iterable[CatalogRecord]:
     """Iterate over records in the NLM Catalog."""
     import pyobo
     from orcid_downloader.lexical import get_orcid_grounder
 
-    ror_grounder = pyobo.get_grounder("ror")
-    mesh_grounder = pyobo.get_grounder("mesh")
-    author_grounder = get_orcid_grounder()
+    ror_grounder = cast(Grounder, pyobo.get_grounder("ror"))
+    mesh_grounder = cast(Grounder, pyobo.get_grounder("mesh"))
+    author_grounder: Grounder = get_orcid_grounder()
 
-    for path in tqdm(ensure_serfile_catalog(force=force), desc="Processing NLM Catalog"):
+    for path in tqdm(
+        ensure_serfile_catalog(refresh_index=refresh_index),
+        desc="Processing NLM Catalog",
+        unit="file",
+    ):
         yield from _parse_catalog(
             path,
-            force_process=force_process or force,
+            force_process=force_process,
             ror_grounder=ror_grounder,
             mesh_grounder=mesh_grounder,
             author_grounder=author_grounder,
         )
 
 
-def ensure_catfile_catalog(*, force: bool = False) -> list[Path]:
+def ensure_catfile_catalog(*, refresh_index: bool = True) -> list[Path]:
     """Get the entire NLM Catalog via CatfilePlus files."""
-    return list(_iter_catfile_catalog(force=force))
+    return list(_iter_catfile_catalog(refresh_index=refresh_index))
 
 
-def ensure_serfile_catalog(*, force: bool = False) -> list[Path]:
+def ensure_serfile_catalog(*, refresh_index: bool = True) -> list[Path]:
     """Get the entire NLM Catalog via Serfile files."""
-    return list(_iter_serfile_catalog(force=force))
+    return list(_iter_serfile_catalog(refresh_index=refresh_index))
 
 
 def _parse_catalog(
@@ -657,90 +822,98 @@ def _parse_catalog(
     mesh_grounder: ssslm.Grounder,
     author_grounder: ssslm.Grounder,
 ) -> Iterable[CatalogRecord]:
-    cache_path = path.with_suffix(".json.gz")
-    if cache_path.is_file() and not force_process and False:
-        yield from _read_catalog(cache_path)
+    cache_path = path.with_suffix(".jsonl.gz")
+    if cache_path.is_file() and not force_process:
+        # TODO log if empty
+        yield from iter_pydantic_jsonl(cache_path, CatalogRecord)
     else:
-        try:
-            tree = etree.parse(path)
-        except SyntaxError:
-            tqdm.write(f"{path} failed to parse, skipping")
-            return
-        catalog_records = []
-        for tag in tree.findall("NLMCatalogRecord"):
-            catalog_record = _extract_catalog_record(
-                tag,
+        catalog_records = list(
+            _parse_catalog_helper(
+                path,
                 ror_grounder=ror_grounder,
                 mesh_grounder=mesh_grounder,
                 author_grounder=author_grounder,
             )
-            if catalog_record:
-                catalog_records.append(catalog_record)
-
-        with gzip.open(cache_path, mode="wt") as file:
-            _dump_catalog(catalog_records, file)
-
+        )
+        write_pydantic_jsonl(catalog_records, cache_path)
         yield from catalog_records
 
 
-def _read_catalog(cache_path: Path) -> Iterable[CatalogRecord]:
-    with gzip.open(cache_path, mode="rt") as file:
-        for d in json.load(file):
-            yield CatalogRecord.model_validate(d)
+def _parse_catalog_helper(
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
+) -> Iterable[CatalogRecord]:
+    try:
+        tree = etree.parse(path)
+    except SyntaxError:
+        tqdm.write(f"{path} failed to parse, skipping")
+        return
+    for tag in tree.findall("NLMCatalogRecord"):
+        if catalog_record := _extract_catalog_record(
+            tag,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
+        ):
+            yield catalog_record
 
 
-def _dump_catalog(catalog_records: list[CatalogRecord], file: TextIO, **kwargs: Any) -> None:
-    json.dump(
-        [
-            catalog_record.model_dump(exclude_none=True, exclude_defaults=True)
-            for catalog_record in catalog_records
-        ],
-        file,
-        default=_json_default,
-        **kwargs,
-        ensure_ascii=False,
-    )
-
-
-def _iter_catfile_catalog(*, force: bool = False) -> Iterable[Path]:
+def _iter_catfile_catalog(*, refresh_index: bool = True) -> Iterable[Path]:
     module = MODULE.module("catalog-catfile")
     return thread_map(  # type:ignore
-        lambda x: module.ensure(url=x, force=force),
-        _iter_catpluslease_urls(),
+        lambda url: module.ensure(url=url),
+        _iter_catpluslease_urls(refresh=refresh_index),
         desc="Downloading catalog catfiles",
         leave=False,
     )
 
 
-def _iter_serfile_catalog(*, force: bool = False) -> Iterable[Path]:
+def _iter_serfile_catalog(*, refresh_index: bool = True) -> Iterable[Path]:
     module = MODULE.module("catalog-serfile")
     return thread_map(  # type:ignore
-        lambda x: module.ensure(url=x, force=force),
-        _iter_serfile_urls(),
+        lambda url: module.ensure(url=url),
+        _iter_serfile_urls(refresh=refresh_index),
         desc="Downloading catalog serfiles",
         leave=False,
     )
 
 
-def _iter_catpluslease_urls() -> Iterable[str]:
+def _iter_catpluslease_urls(*, refresh: bool = True) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     yield from _iter_catalog_urls(
         base="https://ftp.nlm.nih.gov/projects/catpluslease/",
         skip_prefix="catplusbase",
         include_prefix="catplus",
+        refresh=refresh,
     )
 
 
-def _iter_serfile_urls() -> Iterable[str]:
+def _iter_serfile_urls(*, refresh: bool = True) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     yield from _iter_catalog_urls(
         base="https://ftp.nlm.nih.gov/projects/serfilelease/",
         skip_prefix="serfilebase",
         include_prefix="serfile",
+        refresh=refresh,
     )
 
 
-def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iterable[str]:
+def _iter_catalog_urls(
+    base: str, skip_prefix: str, include_prefix: str, *, refresh: bool = True
+) -> Iterable[str]:
+    path: Path = MODULE.join(name=f"{include_prefix}-index.txt")
+    if path.is_file() and not refresh:
+        yield from path.read_text().splitlines()
+    else:
+        urls = list(_iter_catalog_urls_helper(base, skip_prefix, include_prefix))
+        path.write_text("\n".join(urls))
+        yield from urls
+
+
+def _iter_catalog_urls_helper(base: str, skip_prefix: str, include_prefix: str) -> Iterable[str]:
     # see https://www.nlm.nih.gov/databases/download/catalog.html
     res = requests.get(base, timeout=300)
     soup = BeautifulSoup(res.text, "html.parser")
@@ -761,15 +934,20 @@ def _iter_catalog_urls(base: str, skip_prefix: str, include_prefix: str) -> Iter
 
 @click.command(name="catalog")
 @click.option("-f", "--force-process", is_flag=True)
-def _main(force_process: bool) -> None:
+@click.option("--refresh-index/--no-refresh-index", is_flag=True)
+def _main(force_process: bool, refresh_index: bool) -> None:  # noqa:C901
     """Download and process the NLM catalog."""
     from collections import Counter
 
-    from tabulate import tabulate
+    from pystow.utils import tabulate_counter
 
-    publication_type_counter: Counter[str] = Counter()
-    imprint_type_counter: Counter[str | None] = Counter()
-    language_counter: Counter[str] = Counter()
+    publication_type_counter: Counter[tuple[str, str | None]] = Counter()
+    heading_counter: Counter[tuple[str, str | None]] = Counter()
+    imprint_type_counter: Counter[str] = Counter()
+    imprint_count_counter: Counter[int] = Counter()
+    imprint_place_counter: Counter[str] = Counter()
+    imprint_counter: Counter[tuple[str, str | None]] = Counter()
+    language_counter: Counter[tuple[str, str]] = Counter()
     language_type_counter: Counter[str] = Counter()
     type_counter: Counter[str] = Counter()
     issuance_counter: Counter[str] = Counter()
@@ -777,23 +955,36 @@ def _main(force_process: bool) -> None:
     content_type_counter: Counter[str] = Counter()
     media_type_counter: Counter[str] = Counter()
     carrier_type_counter: Counter[str] = Counter()
+    status_counter: Counter[str] = Counter()
+    owner_counter: Counter[str] = Counter()
 
-    records = process_catalog(force_process=force_process)
+    records = process_catalog(force_process=force_process, refresh_index=refresh_index)
     click.echo(f"There are {len(records):,} catalog records")
     for record in records:
         resource_info = record.resource_info
         if not resource_info:
             continue
-        for pt in record.publication_type_mesh_ids:
-            publication_type_counter[pt] += 1
+        for publication_type in record.publication_types:
+            publication_type_counter[publication_type.identifier, publication_type.name] += 1
+
+        for heading in record.headings:
+            heading_counter[heading.reference.identifier, heading.reference.name] += 1
 
         for imprint in record.imprints:
-            imprint_type_counter[imprint.type] += 1
+            imprint_counter[
+                imprint.name or "none",
+                imprint.reference.identifier if imprint.reference is not None else None,
+            ] += 1
+            imprint_place_counter[imprint.place or "none"] += 1
+            imprint_type_counter[imprint.type or "none"] += 1
 
         for lang in record.languages:
-            language_counter[lang.value] += 1
+            language_counter[lang.alpha3, lang.name] += 1
             language_type_counter[lang.type] += 1
 
+        imprint_count_counter[len(record.imprints or [])] += 1
+        status_counter[record.status] += 1
+        owner_counter[record.owner] += 1
         type_counter[resource_info.type] += 1
         issuance_counter[resource_info.issuance] += 1
         for resource_unit in resource_info.resource_units:
@@ -803,35 +994,28 @@ def _main(force_process: bool) -> None:
             media_type_counter[resource_info.resource.media_type] += 1
             carrier_type_counter[resource_info.resource.carrier_type] += 1
 
-    click.secho("\nPublication Type Counter", fg="blue")
-    click.echo(tabulate(publication_type_counter.most_common()))
+    def _tabulate(counter: Counter[Any], *headers: str, n: int | None = None) -> None:
+        click.echo()
+        if n is not None:
+            click.secho(f"showing top {n}", fg="yellow")
+        click.echo(tabulate_counter(counter, n=n, headers=[*headers, "Count"], tablefmt="github"))
 
-    click.secho("\nImprint Type Counter", fg="blue")
-    click.echo(tabulate(imprint_type_counter.most_common()))
-
-    click.secho("\nLanguage Counter", fg="blue")
-    click.echo(tabulate(language_counter.most_common()))
-
-    click.secho("\nLanguage Type Counter", fg="blue")
-    click.echo(tabulate(language_type_counter.most_common()))
-
-    click.secho("\nResource Type Counter", fg="blue")
-    click.echo(tabulate(type_counter.most_common()))
-
-    click.secho("\nResource Issuance Counter", fg="blue")
-    click.echo(tabulate(issuance_counter.most_common()))
-
-    click.secho("\nResource Unit Counter", fg="blue")
-    click.echo(tabulate(resource_unit_counter.most_common()))
-
-    click.secho("\nContent Type Counter", fg="blue")
-    click.echo(tabulate(content_type_counter.most_common()))
-
-    click.secho("\nMedia Type Counter", fg="blue")
-    click.echo(tabulate(media_type_counter.most_common()))
-
-    click.secho("\nCarrier Type Counter", fg="blue")
-    click.echo(tabulate(carrier_type_counter.most_common()))
+    _tabulate(heading_counter, "MeSH", "Heading", n=50)
+    _tabulate(status_counter, "Publication Status")
+    _tabulate(owner_counter, "Publication Owner")
+    _tabulate(publication_type_counter, "MeSH", "Publication Type")
+    _tabulate(imprint_counter, "Imprint", "ROR", n=50)
+    _tabulate(imprint_place_counter, "Imprint Place", n=50)
+    _tabulate(imprint_type_counter, "Imprint Type")
+    _tabulate(imprint_count_counter, "Imprint Arity")
+    _tabulate(language_counter, "ISO639.3", "Language")
+    _tabulate(language_type_counter, "Language Type")
+    _tabulate(type_counter, "Resource Type")
+    _tabulate(issuance_counter, "Resource Issuance")
+    _tabulate(resource_unit_counter, "Resource Unit")
+    _tabulate(content_type_counter, "Content Type")
+    _tabulate(media_type_counter, "Media Type")
+    _tabulate(carrier_type_counter, "Carrier Type")
 
 
 if __name__ == "__main__":

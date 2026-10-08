@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE NLMCatalogRecordSet PUBLIC "-//NLM//DTD CatalogRecord, 1st January 2018//EN"
+        "https://www.nlm.nih.gov/databases/dtd/nlmcatalogrecordset_180101.dtd">
+<NLMCatalogRecordSet>
+    <NLMCatalogRecord Owner="NLM" Status="Completed">
+        <NlmUniqueID>9919264951506676</NlmUniqueID>
+        <DateCreated>
+            <Year>2018</Year>
+            <Month>10</Month>
+            <Day>09</Day>
+        </DateCreated>
+        <DateRevised>
+            <Year>2026</Year>
+            <Month>07</Month>
+            <Day>20</Day>
+        </DateRevised>
+        <DateAuthorized>
+            <Year>2026</Year>
+            <Month>07</Month>
+            <Day>20</Day>
+        </DateAuthorized>
+        <DateCompleted>
+            <Year>2026</Year>
+            <Month>07</Month>
+            <Day>20</Day>
+        </DateCompleted>
+        <TitleMain>
+            <Title Sort="0">Environmental pollutants &amp; bioavailability.</Title>
+        </TitleMain>
+        <MedlineTA>Environ Pollut Bioavailab</MedlineTA>
+        <TitleAlternate Owner="NOTNLM" TitleType="OtherTA">
+            <Title Sort="N">Environ. pollut. bioavailab.</Title>
+            <OtherInformation>(Online)</OtherInformation>
+        </TitleAlternate>
+        <TitleAlternate Owner="Undetermined" TitleType="Key">
+            <Title Sort="0">Environmental pollutants &amp; bioavailability</Title>
+            <OtherInformation>(Online)</OtherInformation>
+        </TitleAlternate>
+        <TitleAlternate Owner="NLM" TitleType="Other">
+            <Title Sort="N">Environmental pollutants and bioavailability</Title>
+        </TitleAlternate>
+        <TitleRelated Owner="NLM" TitleType="Preceding">
+            <Title Sort="N">Chemical speciation and bioavailability</Title>
+            <RecordID Source="LC">92659521</RecordID>
+            <RecordID Source="OCLC">20003212</RecordID>
+            <RecordID Source="NLM">9884434</RecordID>
+            <ISSN IssnType="Undetermined">0954-2299</ISSN>
+        </TitleRelated>
+        <ResourceInfo>
+            <TypeOfResource>Serial</TypeOfResource>
+            <Issuance>continuing</Issuance>
+            <ResourceUnit>remote electronic resource</ResourceUnit>
+            <ResourceUnit>text</ResourceUnit>
+            <Resource>
+                <ContentType>text</ContentType>
+                <MediaType>computer</MediaType>
+                <CarrierType>online resource</CarrierType>
+            </Resource>
+        </ResourceInfo>
+        <PublicationTypeList>
+            <PublicationType>Periodical</PublicationType>
+        </PublicationTypeList>
+        <PublicationInfo>
+            <Country>England</Country>
+            <PlaceCode Authority="MARC">enk</PlaceCode>
+            <Imprint ImprintType="Original" FunctionType="Publication">
+                <Place>Abingdon, UK :</Place>
+                <Entity>Taylor &amp; Francis,</Entity>
+                <DateIssued>[2019]-</DateIssued>
+                <ImprintFull>Abingdon, UK : Taylor &amp; Francis, [2019]-</ImprintFull>
+            </Imprint>
+            <PublicationFirstYear>2019</PublicationFirstYear>
+            <PublicationEndYear>9999</PublicationEndYear>
+            <DatesOfSerialPublication>Began with: Volume 31, issue 1 (2019).</DatesOfSerialPublication>
+            <Frequency FrequencyType="Current">Annual</Frequency>
+        </PublicationInfo>
+        <Language LangType="Primary">eng</Language>
+        <PhysicalDescription>
+            <Extent>1 online resource</Extent>
+        </PhysicalDescription>
+        <IndexingSourceList>
+            <IndexingSource>
+                <IndexingSourceName IndexingTreatment="Unknown">PubMed</IndexingSourceName>
+                <Coverage>Selected citations only</Coverage>
+            </IndexingSource>
+        </IndexingSourceList>
+        <GeneralNote Owner="NLM">Articles are published online as they are received and cumulated into annual volumes.
+        </GeneralNote>
+        <GeneralNote Owner="NLM">Also issued in print.</GeneralNote>
+        <MeshHeadingList>
+            <MeshHeading>
+                <DescriptorName MajorTopicYN="N">Biological Availability</DescriptorName>
+            </MeshHeading>
+            <MeshHeading>
+                <DescriptorName MajorTopicYN="Y">Environmental Pollutants</DescriptorName>
+            </MeshHeading>
+        </MeshHeadingList>
+        <Classification NLMCallNumberYN="Y" Authority="NLM" CallNumberType="NLMClass">W1</Classification>
+        <ELocationList>
+            <ELocation>
+                <ELocationID EIdType="url" ValidYN="Y">https://www.tandfonline.com/journals/tcsb21</ELocationID>
+            </ELocation>
+        </ELocationList>
+        <LCCN ValidYN="Y">2018203776</LCCN>
+        <ISSN ValidYN="Y" IssnType="Electronic">2639-5940</ISSN>
+        <ISSN ValidYN="N" IssnType="Undetermined">2639-5932</ISSN>
+        <OtherID Prefix="(OCoLC)" Source="OCLC">1056175826</OtherID>
+    </NLMCatalogRecord>
+</NLMCatalogRecordSet>

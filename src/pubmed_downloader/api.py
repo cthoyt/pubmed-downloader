@@ -14,7 +14,7 @@ import typing
 from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import Any, Literal, TextIO, TypeAlias
+from typing import Any, Literal, TextIO, TypeAlias, cast
 from xml.etree.ElementTree import Element
 
 import click
@@ -28,6 +28,7 @@ from lxml import etree
 from more_click import verbose_option
 from pydantic import BaseModel, Field
 from pystow.utils import safe_open_writer
+from ssslm import Grounder
 from tqdm import tqdm
 from tqdm.contrib import tmap
 from tqdm.contrib.concurrent import process_map, thread_map
@@ -191,7 +192,7 @@ class Article(BaseModel):
         for type_mesh_id in self.type_mesh_ids:
             yield v.rdf_type, Reference(prefix="mesh", identifier=type_mesh_id)
         for heading in self.headings:
-            yield HAS_TOPIC, Reference(prefix="mesh", identifier=heading.mesh_id)
+            yield HAS_TOPIC, heading.reference
         yield IN_JOURNAL, Reference(prefix="nlm", identifier=self.journal.nlm_catalog_id)
         for author in self.authors:
             match author:
@@ -412,13 +413,14 @@ def _get_journal_issue(article: Element) -> JournalIssue:
     volume = None
     issue = None
     publication_date = None
-    if (journal_element := article.find("Journal")) is not None:
-        if (journal_issue_element := journal_element.find("JournalIssue")) is not None:
-            volume = journal_issue_element.findtext("Volume")
-            # TODO create data model for issue? e.g., "1-2"
-            issue = journal_issue_element.findtext("Issue")
-            if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
-                publication_date = parse_date(pubdate_element)
+    if (journal_element := article.find("Journal")) is not None and (
+        journal_issue_element := journal_element.find("JournalIssue")
+    ) is not None:
+        volume = journal_issue_element.findtext("Volume")
+        # TODO create data model for issue? e.g., "1-2"
+        issue = journal_issue_element.findtext("Issue")
+        if (pubdate_element := journal_issue_element.find("PubDate")) is not None:
+            publication_date = parse_date(pubdate_element)
     return JournalIssue(
         volume=volume,
         issue=issue,
@@ -537,7 +539,7 @@ def _shared_process(
     unit: str,
     multiprocessing: bool = False,
 ) -> Iterable[Article]:
-    tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing {unit}s"}
+    tqdm_kwargs = {"unit_scale": True, "unit": unit, "desc": f"Processing PubMed {unit}s"}
     if multiprocessing:
         n_workers = (os.cpu_count() or 5) - 2
         mp.set_start_method("spawn", force=True)
@@ -605,14 +607,18 @@ def _ensure_grounders(
         import pyobo
 
         logger.info("getting ROR grounder")
-        ror_grounder = pyobo.get_grounder("ror")
+        ror_grounder = cast(Grounder, pyobo.get_grounder("ror"))
+        if ror_grounder.empty():
+            raise ValueError("ROR grounder was empty")
         logger.info("done getting ROR grounder")
 
     if mesh_grounder is None:
         import pyobo
 
         logger.info("getting MeSH grounder")
-        mesh_grounder = pyobo.get_grounder("mesh")
+        mesh_grounder = cast(Grounder, pyobo.get_grounder("mesh"))
+        if mesh_grounder.empty():
+            raise ValueError("MeSH grounder was empty")
         logger.info("done getting MeSH grounder")
 
     if author_grounder is None:
@@ -620,6 +626,8 @@ def _ensure_grounders(
 
         logger.info("getting ORCiD grounder")
         author_grounder = get_orcid_grounder()
+        if author_grounder.empty():
+            raise ValueError("ORCiD grounder was empty")
         logger.info("done getting ORCiD grounder")
 
     return ror_grounder, mesh_grounder, author_grounder

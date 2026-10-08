@@ -7,7 +7,7 @@ import logging
 import re
 from calendar import monthrange
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Literal
 from xml.etree.ElementTree import Element
 
 import pystow
@@ -81,8 +81,8 @@ def _get_day(date_tag: Element, year: int, month: int) -> int:
         return 1
     day = int(day_tag.text)
     _start, n_days = monthrange(year, month)
-    if day > n_days:  # sometimes there are issues where date is out of range
-        day = n_days
+    # sometimes there are issues where date is out of range
+    day = min(day, n_days)
     return day
 
 
@@ -129,6 +129,12 @@ class Author(BaseModel):
     name: str | None = None
     orcid: str | None = None
     roles: list[str] = Field(default_factory=list)
+
+    def get_reference(self) -> NamableReference | None:
+        """Get the ORCiD reference, if possible."""
+        if not self.orcid:
+            return None
+        return NamableReference(prefix="orcid", identifier=self.orcid, name=self.name)
 
 
 class Collective(BaseModel):
@@ -202,7 +208,7 @@ def parse_author(  # noqa:C901
     initials_tag = tag.find("Initials")
     collective_name_tag = tag.find("CollectiveName")
 
-    roles = [role_tag.text for role_tag in tag.findall("Role")]
+    roles = [role_tag.text for role_tag in tag.findall("Role") if role_tag.text is not None]
 
     if collective_name_tag is not None and collective_name_tag.text:
         name = collective_name_tag.text.rstrip(".")
@@ -279,10 +285,9 @@ class Qualifier(BaseModel):
 
 
 class Heading(BaseModel):
-    """Represents a MeSH heading annnotation."""
+    """Represents a MeSH heading annotation."""
 
-    name: str
-    mesh_id: str
+    reference: NamableReference
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
@@ -299,24 +304,28 @@ def parse_mesh_heading(
         return None
 
     descriptor_name = descriptor_name_tag.text
-    descriptor_mesh_id = _get_mesh_id(descriptor_name_tag, mesh_heading_tag=mesh_heading_tag)
+    descriptor_mesh_reference = _ground_mesh(
+        descriptor_name_tag,
+        mesh_heading_tag=mesh_heading_tag,
+        matcher=mesh_grounder,
+    )
 
-    if not descriptor_name and not descriptor_mesh_id:
+    if not descriptor_name and not descriptor_mesh_reference:
         return None
-    elif descriptor_name and not descriptor_mesh_id:
+    elif descriptor_name and not descriptor_mesh_reference:
         best_match = (
             mesh_grounder.get_best_match(descriptor_name.rstrip("."))
             if mesh_grounder is not None
             else None
         )
         if best_match is not None:
-            descriptor_mesh_id = best_match.identifier
+            descriptor_mesh_reference = best_match.reference
         else:
             if descriptor_name not in MESH_MISSES:
                 tqdm.write(f"could not ground mesh descriptor: {descriptor_name}")
                 MESH_MISSES.add(descriptor_name)
             return None
-    elif descriptor_mesh_id and not descriptor_name:
+    elif descriptor_mesh_reference and not descriptor_name:
         raise NotImplementedError("need to lookup descriptor MeSH name automatically")
     # else, name and MeSH ID both available, and all good to continue
 
@@ -324,6 +333,8 @@ def parse_mesh_heading(
     qualifiers = []
     # FIXME is this supposed to look in tag or descriptor_name_tag
     for qualifier_tag in mesh_heading_tag.findall("QualifierName"):
+        if qualifier_tag.text is None:
+            continue
         qualifier_mesh_id = qualifier_tag.attrib.get("UI")
         qualifiers.append(
             Qualifier(
@@ -334,8 +345,7 @@ def parse_mesh_heading(
         )
 
     return Heading(
-        mesh_id=descriptor_mesh_id,
-        name=descriptor_name,
+        reference=descriptor_mesh_reference,
         major=major,
         qualifiers=qualifiers or None,
     )
@@ -344,16 +354,41 @@ def parse_mesh_heading(
 MESH_RDF_URI_PREFIX = "https://id.nlm.nih.gov/mesh/"
 
 
-def _get_mesh_id(
-    descriptor_name_tag: Element, mesh_heading_tag: Element | None = None
-) -> str | None:
-    if "UI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
-    if "URI" in descriptor_name_tag.attrib:
-        return descriptor_name_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
-    if mesh_heading_tag is not None and "URI" in mesh_heading_tag.attrib:
-        return mesh_heading_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
-    return None
+def _ground_mesh(
+    element: Element,
+    *,
+    matcher: ssslm.Matcher | None = None,
+    mesh_heading_tag: Element | None = None,
+) -> NamableReference | None:
+    if "UI" in element.attrib:
+        mesh_id = element.attrib["UI"].removeprefix(MESH_RDF_URI_PREFIX)
+    elif "URI" in element.attrib:
+        mesh_id = element.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    elif mesh_heading_tag is not None and "URI" in mesh_heading_tag.attrib:
+        mesh_id = mesh_heading_tag.attrib["URI"].removeprefix(MESH_RDF_URI_PREFIX)
+    elif element.text is not None and matcher is not None:
+        if match := matcher.get_best_match(element.text):
+            return match.reference
+        return None
+    else:
+        return None
+    mesh_id = (
+        mesh_id.removeprefix("(uri) http://id.nlm.nih.gov/mesh/")
+        .removeprefix("http://id.nlm.nih.gov/mesh/")
+        .removeprefix("(DNLM)")
+    )
+    mesh_id, _, _qualifier = mesh_id.partition("Q")
+    # TODO pass qualifiers around? the issue is if there are
+    #  multiple qualifiers like in 20191201.xml example below,
+    #  they dont all get put into the URI
+    """
+    <MeshHeading URI="https://id.nlm.nih.gov/mesh/D000820Q000453">
+        <DescriptorName MajorTopicYN="N">Animal Diseases</DescriptorName>
+        <QualifierName MajorTopicYN="N">epidemiology</QualifierName>
+        <QualifierName MajorTopicYN="N">prevention &amp; control</QualifierName>
+    </MeshHeading>
+    """
+    return NamableReference(prefix="mesh", identifier=mesh_id, name=element.text)
 
 
 def _parse_yn(s: str) -> bool:
@@ -366,7 +401,7 @@ def _parse_yn(s: str) -> bool:
             raise ValueError(s)
 
 
-SPLOOSHED_RE = re.compile(r"^\d{15}(\d|X)$")
+SPLOOSHED_RE = re.compile(r"^\d{15}([\dX])$")
 
 
 def _clean_orcid(s: str) -> str | None:
@@ -389,12 +424,6 @@ def _clean_orcid(s: str) -> str | None:
     else:
         logger.debug(f"unhandled ORCID: {s}")
         return None
-
-
-def _json_default(o: Any) -> Any:
-    if isinstance(o, datetime.date | datetime.datetime):
-        return o.isoformat()
-    return o
 
 
 def clean_pubmed_ids(pubmed_ids: Iterable[str | int]) -> Iterable[str]:

@@ -138,12 +138,9 @@ CATEGORY_TO_LABELS = {
         "DISCUSSION AND CONCLUSION",
         "DISCUSSION/CONCLUSIONS",
         "discussion and conclusion",
-        #
         "DISCUSSION AND IMPLICATIONS",
-        #
         "LIMITATIONS",
         "Limitations",
-        #
         "Future work",
     },
     "conclusion": {
@@ -154,7 +151,6 @@ CATEGORY_TO_LABELS = {
         "CONCLUSIONS",
         "take-home message",
         "take-home messages",
-        #
         "CONCLUSION AND IMPLICATIONS",
         "CONCLUSIONS AND IMPLICATIONS",
         "CONCLUSIONS AND CLINICAL IMPLICATIONS",
@@ -164,7 +160,6 @@ CATEGORY_TO_LABELS = {
         "conclusion(s)",
         "conclusions and clinical relevance",
         "conclusions/interpretation",
-        #
         "reviewer's conclusions",
     },
     "funding": {

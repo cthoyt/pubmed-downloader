@@ -48,10 +48,14 @@ class TestEDirect(unittest.TestCase):
         """Test getting titles."""
         self.assertEqual(
             [
-                "Disease networks. Uncovering disease-disease relationships "
-                "through the incomplete interactome.",
-                "Early developmental conditioning of later health and disease: "
-                "physiology or pathophysiology?",
+                (
+                    "Disease networks. Uncovering disease-disease relationships "
+                    "through the incomplete interactome."
+                ),
+                (
+                    "Early developmental conditioning of later health and disease: "
+                    "physiology or pathophysiology?"
+                ),
             ],
             get_titles(["25700523", "25287859"]),
         )
