@@ -62,7 +62,7 @@ class TestParseCatalog(unittest.TestCase):
                 Heading(major=False, reference=BIOLOGICAL_AVAILABILITY_REFERENCE),
                 Heading(major=True, reference=ENVIRONMENTAL_POLLUTANTS_REFERENCE),
             ],
-            record.mesh_headings,
+            record.headings,
         )
         self.assertEqual(
             [PERIODICAL_REFERENCE],

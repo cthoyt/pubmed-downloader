@@ -324,7 +324,7 @@ class CatalogRecord(BaseModel):
     title_alternatives: list[TitleAlternative] = Field(default_factory=list)
     title_relatives: list[TitleRelated] = Field(default_factory=list)
     publication_types: list[NamableReference] = Field(default_factory=list)
-    mesh_headings: list[Heading] = Field(default_factory=list)
+    headings: list[Heading] = Field(default_factory=list)
     date_created: datetime.date | None = None
     date_revised: datetime.date | None = None
     date_authorized: datetime.date | None = None
@@ -528,11 +528,10 @@ def _extract_catalog_record(  # noqa:C901
         if (mesh_reference := _ground_mesh(publication_type_tag, matcher=mesh_grounder)) is not None
     )
 
-    mesh_headings = [
-        mesh_heading
-        for mesh_heading_tag in tag.findall(".//MeshHeadingList/MeshHeading")
-        if (mesh_heading := parse_mesh_heading(mesh_heading_tag, mesh_grounder=mesh_grounder))
-        is not None
+    headings = [
+        heading
+        for heading_tag in tag.findall(".//MeshHeadingList/MeshHeading")
+        if (heading := parse_mesh_heading(heading_tag, mesh_grounder=mesh_grounder)) is not None
     ]
 
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
@@ -594,7 +593,7 @@ def _extract_catalog_record(  # noqa:C901
         title_relatives=rels,
         medline_short_title=tag.findtext("MedlineTA"),
         publication_types=publication_types,
-        mesh_headings=mesh_headings,
+        headings=headings,
         date_created=parse_date(tag.find("DateCreated")),
         date_revised=parse_date(tag.find("DateRevised")),
         date_authorized=parse_date(tag.find("DateAuthorized")),
@@ -921,17 +920,18 @@ def _iter_catalog_urls_helper(base: str, skip_prefix: str, include_prefix: str) 
 @click.command(name="catalog")
 @click.option("-f", "--force-process", is_flag=True)
 @click.option("--refresh-index/--no-refresh-index", is_flag=True)
-def _main(force_process: bool, refresh_index: bool) -> None:
+def _main(force_process: bool, refresh_index: bool) -> None:  # noqa:C901
     """Download and process the NLM catalog."""
     from collections import Counter
 
     from pystow.utils import tabulate_counter
 
     publication_type_counter: Counter[tuple[str, str | None]] = Counter()
+    heading_counter: Counter[tuple[str, str | None]] = Counter()
     imprint_type_counter: Counter[str] = Counter()
     imprint_count_counter: Counter[int] = Counter()
     imprint_place_counter: Counter[str] = Counter()
-    imprint_counter: Counter[str] = Counter()
+    imprint_counter: Counter[tuple[str, bool]] = Counter()
     language_counter: Counter[tuple[str, str]] = Counter()
     language_type_counter: Counter[str] = Counter()
     type_counter: Counter[str] = Counter()
@@ -952,8 +952,11 @@ def _main(force_process: bool, refresh_index: bool) -> None:
         for publication_type in record.publication_types:
             publication_type_counter[publication_type.identifier, publication_type.name] += 1
 
+        for heading in record.headings:
+            heading_counter[heading.reference.identifier, heading.reference.name] += 1
+
         for imprint in record.imprints:
-            imprint_counter[imprint.name or "none"] += 1
+            imprint_counter[imprint.name or "none", imprint.reference is not None] += 1
             imprint_place_counter[imprint.place or "none"] += 1
             imprint_type_counter[imprint.type or "none"] += 1
 
@@ -973,19 +976,21 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             media_type_counter[resource_info.resource.media_type] += 1
             carrier_type_counter[resource_info.resource.carrier_type] += 1
 
-    def _tabulate(counter: Counter[Any], title: str, *, n: int | None = None) -> None:
+    def _tabulate(counter: Counter[Any], *headers: str, n: int | None = None) -> None:
         click.echo()
         if n is not None:
             click.secho(f"showing top {n}", fg="yellow")
-        click.echo(tabulate_counter(counter, n=n, headers=[title, "Count"], tablefmt="github"))
+        click.echo(tabulate_counter(counter, n=n, headers=[*headers, "Count"], tablefmt="github"))
 
+    _tabulate(heading_counter, "MeSH", "Heading")
     _tabulate(status_counter, "Publication Status")
     _tabulate(owner_counter, "Publication Owner")
-    _tabulate(publication_type_counter, "Publication Type")
-    _tabulate(imprint_counter, "Imprint", n=50)
+    _tabulate(publication_type_counter, "MeSH", "Publication Type")
+    _tabulate(imprint_counter, "Imprint", "Grounded?", n=50)
     _tabulate(imprint_place_counter, "Imprint Place", n=50)
     _tabulate(imprint_type_counter, "Imprint Type")
     _tabulate(imprint_count_counter, "Imprint Arity")
+    _tabulate(language_counter, "ISO639.3", "Language")
     _tabulate(language_type_counter, "Language Type")
     _tabulate(type_counter, "Resource Type")
     _tabulate(issuance_counter, "Resource Issuance")
