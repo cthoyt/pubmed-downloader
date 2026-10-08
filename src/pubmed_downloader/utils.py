@@ -131,6 +131,7 @@ class Author(BaseModel):
     roles: list[str] = Field(default_factory=list)
 
     def get_reference(self) -> NamableReference | None:
+        """Get the ORCiD reference, if possible."""
         if not self.orcid:
             return None
         return NamableReference(prefix="orcid", identifier=self.orcid, name=self.name)
