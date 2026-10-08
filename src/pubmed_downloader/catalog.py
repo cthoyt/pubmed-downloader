@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from curies import NamableReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
-from pydantic_extra_types.language_code import ISO639_3
+from pydantic_extra_types.language_code import ISO639_3, _index_by_alpha3
 from pystow.utils import iter_pydantic_jsonl, read_pydantic_jsonl, write_pydantic_jsonl
 from ssslm import Grounder
 from tqdm import tqdm
@@ -29,7 +29,7 @@ from .utils import (
     Author,
     Collective,
     Heading,
-    _get_mesh_id,
+    _ground_mesh,
     parse_author,
     parse_date,
     parse_mesh_heading,
@@ -260,10 +260,19 @@ class Imprint(BaseModel):
 class Language(BaseModel):
     """Represents a language and its usage annotation."""
 
-    value: ISO639_3
+    alpha3: ISO639_3
 
     # this doesn't really make sense
     type: Literal["Primary", "Summary", "TableOfContents", "Original", "Captions"]
+
+    @property
+    def name(self) -> str:
+        """Get the language name."""
+        return _index_by_alpha3()[self.alpha3].name
+
+    def get_reference(self) -> Reference:
+        """Get a reference."""
+        return Reference(prefix="iso.639-3", identifier=self.alpha3)
 
 
 class TitleAlternative(BaseModel):
@@ -314,7 +323,7 @@ class CatalogRecord(BaseModel):
     medline_short_title: str | None = None
     title_alternatives: list[TitleAlternative] = Field(default_factory=list)
     title_relatives: list[TitleRelated] = Field(default_factory=list)
-    publication_type_mesh_ids: list[str] = Field(default_factory=list)
+    publication_types: list[NamableReference] = Field(default_factory=list)
     mesh_headings: list[Heading] = Field(default_factory=list)
     date_created: datetime.date | None = None
     date_revised: datetime.date | None = None
@@ -401,8 +410,9 @@ def _extract_title_related(tag: Element) -> TitleRelated | None:
     title_sort = inner_tag.attrib["Sort"]
 
     issns = [
-        ISSN(value=issn_tag.text, type=issn_tag.attrib["IssnType"])
+        ISSN(value=issn_tag.text.replace(" ", ""), type=issn_type.replace(" ", ""))
         for issn_tag in tag.findall("ISSN")
+        if issn_tag.text is not None and (issn_type := issn_tag.attrib.get("IssnType")) is not None
     ]
     xrefs = []
     for record_id_tag in tag.findall("RecordID"):
@@ -512,18 +522,17 @@ def _extract_catalog_record(  # noqa:C901
         if (language := _get_language(language_tag)) is not None
     ]
 
-    publication_type_mesh_ids = sorted(
-        # there are less than 30 instances of this data being broken where
-        # the remove prefixes are necessary, but it has to be done
-        mesh_id
+    publication_types = sorted(
+        mesh_reference
         for publication_type_tag in tag.findall(".//PublicationTypeList/PublicationType")
-        if (mesh_id := _get_mesh_id(publication_type_tag)) is not None
+        if (mesh_reference := _ground_mesh(publication_type_tag, matcher=mesh_grounder)) is not None
     )
 
     mesh_headings = [
-        heading
-        for x in tag.findall(".//MeshHeadingList/MeshHeading")
-        if (heading := parse_mesh_heading(x, mesh_grounder=mesh_grounder)) is not None
+        mesh_heading
+        for mesh_heading_tag in tag.findall(".//MeshHeadingList/MeshHeading")
+        if (mesh_heading := parse_mesh_heading(mesh_heading_tag, mesh_grounder=mesh_grounder))
+        is not None
     ]
 
     xrefs = [xref for xref_tag in tag.findall("OtherID") if (xref := _process_other_id(xref_tag))]
@@ -584,7 +593,7 @@ def _extract_catalog_record(  # noqa:C901
         title_alternatives=alts,
         title_relatives=rels,
         medline_short_title=tag.findtext("MedlineTA"),
-        publication_type_mesh_ids=publication_type_mesh_ids,
+        publication_types=publication_types,
         mesh_headings=mesh_headings,
         date_created=parse_date(tag.find("DateCreated")),
         date_revised=parse_date(tag.find("DateRevised")),
@@ -651,7 +660,7 @@ def _get_language(language_tag: Element) -> Language | None:
     if iso_639_2b in UNUSABLE_LEGACY_LANGUAGE_CODE:
         return None
     return Language(
-        value=LEGACY_LANGUAGE_CODE_TO_STANDARD.get(iso_639_2b, iso_639_2b),
+        alpha3=LEGACY_LANGUAGE_CODE_TO_STANDARD.get(iso_639_2b, iso_639_2b),
         type=language_tag.attrib["LangType"],
     )
 
@@ -801,26 +810,41 @@ def _parse_catalog(
 ) -> Iterable[CatalogRecord]:
     cache_path = path.with_suffix(".jsonl.gz")
     if cache_path.is_file() and not force_process:
+        # TODO log if empty
         yield from iter_pydantic_jsonl(cache_path, CatalogRecord)
     else:
-        try:
-            tree = etree.parse(path)
-        except SyntaxError:
-            tqdm.write(f"{path} failed to parse, skipping")
-            return
-        catalog_records = []
-        for tag in tree.findall("NLMCatalogRecord"):
-            catalog_record = _extract_catalog_record(
-                tag,
+        catalog_records = list(
+            _parse_catalog_helper(
+                path,
                 ror_grounder=ror_grounder,
                 mesh_grounder=mesh_grounder,
                 author_grounder=author_grounder,
             )
-            if catalog_record:
-                catalog_records.append(catalog_record)
-
+        )
         write_pydantic_jsonl(catalog_records, cache_path)
         yield from catalog_records
+
+
+def _parse_catalog_helper(
+    path: Path,
+    *,
+    ror_grounder: ssslm.Grounder,
+    mesh_grounder: ssslm.Grounder,
+    author_grounder: ssslm.Grounder,
+) -> Iterable[CatalogRecord]:
+    try:
+        tree = etree.parse(path)
+    except SyntaxError:
+        tqdm.write(f"{path} failed to parse, skipping")
+        return
+    for tag in tree.findall("NLMCatalogRecord"):
+        if catalog_record := _extract_catalog_record(
+            tag,
+            ror_grounder=ror_grounder,
+            mesh_grounder=mesh_grounder,
+            author_grounder=author_grounder,
+        ):
+            yield catalog_record
 
 
 def _iter_catfile_catalog(*, refresh_index: bool = True) -> Iterable[Path]:
@@ -901,14 +925,14 @@ def _main(force_process: bool, refresh_index: bool) -> None:
     """Download and process the NLM catalog."""
     from collections import Counter
 
-    from tabulate import tabulate
+    from pystow.utils import tabulate_counter
 
-    publication_type_counter: Counter[str] = Counter()
+    publication_type_counter: Counter[tuple[str, str | None]] = Counter()
     imprint_type_counter: Counter[str] = Counter()
     imprint_count_counter: Counter[int] = Counter()
     imprint_place_counter: Counter[str] = Counter()
     imprint_counter: Counter[str] = Counter()
-    language_counter: Counter[str] = Counter()
+    language_counter: Counter[tuple[str, str]] = Counter()
     language_type_counter: Counter[str] = Counter()
     type_counter: Counter[str] = Counter()
     issuance_counter: Counter[str] = Counter()
@@ -925,8 +949,8 @@ def _main(force_process: bool, refresh_index: bool) -> None:
         resource_info = record.resource_info
         if not resource_info:
             continue
-        for pt in record.publication_type_mesh_ids:
-            publication_type_counter[pt] += 1
+        for publication_type in record.publication_types:
+            publication_type_counter[publication_type.identifier, publication_type.name] += 1
 
         for imprint in record.imprints:
             imprint_counter[imprint.name or "none"] += 1
@@ -934,7 +958,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:
             imprint_type_counter[imprint.type or "none"] += 1
 
         for lang in record.languages:
-            language_counter[lang.value] += 1
+            language_counter[lang.alpha3, lang.name] += 1
             language_type_counter[lang.type] += 1
 
         imprint_count_counter[len(record.imprints or [])] += 1
@@ -953,7 +977,7 @@ def _main(force_process: bool, refresh_index: bool) -> None:
         click.echo()
         if n is not None:
             click.secho(f"showing top {n}", fg="yellow")
-        click.echo(tabulate(counter.most_common(n=n), headers=[title, "Count"], tablefmt="github"))
+        click.echo(tabulate_counter(counter, n=n, headers=[title, "Count"], tablefmt="github"))
 
     _tabulate(status_counter, "Publication Status")
     _tabulate(owner_counter, "Publication Owner")
