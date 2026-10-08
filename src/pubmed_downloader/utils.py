@@ -290,14 +290,6 @@ class Heading(BaseModel):
     major: bool = False
     qualifiers: list[Qualifier] | None = None
 
-    @property
-    def mesh_id(self) -> str:
-        return self.reference.identifier
-
-    @property
-    def name(self) -> str | None:
-        return self.reference.name
-
 
 MESH_MISSES: set[str] = set()
 
