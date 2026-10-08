@@ -68,8 +68,8 @@ class Journal(BaseModel):
     issns: list[ISSN] = Field(default_factory=list)
     synonyms: list[str] = Field(default_factory=list)
     active: bool = True
-    start_year: int | None
-    end_year: int | None
+    start_year: int | None = None
+    end_year: int | None = None
 
     @property
     def nlm_catalog_url(self) -> str:
