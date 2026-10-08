@@ -7,7 +7,7 @@ from typing import Any
 from curies import NamableReference
 from ssslm import EmptyGrounder, Grounder, Match
 
-from pubmed_downloader.catalog import _parse_catalog_helper
+from pubmed_downloader.catalog import PERIODICAL, _parse_catalog_helper
 from pubmed_downloader.utils import Heading
 
 HERE = Path(__file__).parent.resolve()
@@ -19,11 +19,10 @@ BIOLOGICAL_AVAILABILITY_REFERENCE = NamableReference(
 ENVIRONMENTAL_POLLUTANTS_REFERENCE = NamableReference(
     prefix="mesh", identifier="D004785", name="Environmental Pollutants"
 )
-PERIODICAL_REFERENCE = NamableReference(prefix="mesh", identifier="D020492", name="Periodical")
 REFS = {
     "Biological Availability": BIOLOGICAL_AVAILABILITY_REFERENCE,
     "Environmental Pollutants": ENVIRONMENTAL_POLLUTANTS_REFERENCE,
-    "Periodical": PERIODICAL_REFERENCE,
+    "Periodical": PERIODICAL,
 }
 
 
@@ -64,7 +63,6 @@ class TestParseCatalog(unittest.TestCase):
             ],
             record.headings,
         )
-        self.assertEqual(
-            [PERIODICAL_REFERENCE],
-            record.publication_types,
-        )
+        self.assertEqual([PERIODICAL], record.publication_types)
+        self.assertTrue(record.is_periodical)
+        self.assertFalse(record.is_conference_proceedings)

@@ -14,7 +14,7 @@ import click
 import requests
 import ssslm
 from bs4 import BeautifulSoup
-from curies import NamableReference, Reference
+from curies import NamableReference, NamedReference, Reference
 from lxml import etree
 from pydantic import BaseModel, Field
 from pydantic_extra_types.language_code import ISO639_3, _index_by_alpha3
@@ -311,6 +311,11 @@ CatalogOwner: TypeAlias = Literal[
     "Undetermined",  # 22
 ]
 
+PERIODICAL = NamedReference(prefix="mesh", identifier="D020492", name="Periodical")
+CONFERENCE_PROCEEDINGS = NamedReference(
+    prefix="mesh", identifier="D016423", name="Conference Proceedings"
+)
+
 
 class CatalogRecord(BaseModel):
     """Represents a record in the NLM Catalog."""
@@ -346,6 +351,16 @@ class CatalogRecord(BaseModel):
     def nlm_catalog_url(self) -> str:
         """Get the NLM Catalog URL."""
         return f"https://www.ncbi.nlm.nih.gov/nlmcatalog/{self.nlm_catalog_id}"
+
+    @property
+    def is_periodical(self) -> bool:
+        """Check if this catalog record is a periodical (i.e., a journal)."""
+        return PERIODICAL in self.publication_types
+
+    @property
+    def is_conference_proceedings(self) -> bool:
+        """Check if this catalog record is a conference proceedings."""
+        return CONFERENCE_PROCEEDINGS in self.publication_types
 
 
 def _process_elocation_tag(elt: Element) -> str | None:
