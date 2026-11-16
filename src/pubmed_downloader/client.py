@@ -1,12 +1,14 @@
 """Interact with NCBI rest."""
 
+from __future__ import annotations
+
 import logging
 import os
 import platform
 import shlex
 import stat
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from pathlib import Path
 from typing import Any, Literal, NotRequired, TypeAlias, TypedDict, overload
 
@@ -31,6 +33,8 @@ __all__ = [
     "get_abstracts_dict",
     "get_articles",
     "get_articles_dict",
+    "get_dois_from_pubmed_ids",
+    "get_pubmed_ids_from_dois",
     "get_titles",
     "get_titles_dict",
     "search",
@@ -49,6 +53,10 @@ URL = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.tar.gz"
 URL_APPLE_SILICON = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Silicon.gz"
 URL_LINUX = "https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/xtract.Linux.gz"
 MODULE = pystow.module("ncbi")
+
+TOOL = "python-pubmed-downloader"
+EMAIL = pystow.get_config("pubmed-downloader", "email")
+API_KEY = pystow.get_config("pubmed-downloader", "api_key")
 
 #: https://www.ncbi.nlm.nih.gov/books/NBK25497/ rate limit getting to the API
 ratelimited_requests_get = sleep_and_retry(limits(calls=3, period=1)(requests.get))
@@ -185,6 +193,14 @@ def count_search_results(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> in
     return _request_api(query, **kwargs).count
 
 
+def _finish_params(params: dict[str, Any]) -> None:
+    params["tool"] = TOOL
+    if EMAIL:
+        params["email"] = EMAIL
+    if API_KEY:
+        params["api_key"] = API_KEY
+
+
 def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResult:
     if kwargs.pop("use_text_word", True):
         query += "[tw]"
@@ -204,6 +220,7 @@ def _request_api(query: str, **kwargs: Unpack[PubMedSearchKwargs]) -> SearchResu
         "retstart": retstart,
         "db": "pubmed",
     }
+    _finish_params(params)
     params.update(kwargs)
     res = ratelimited_requests_get(EUTILS_SEARCH_URL, params=params, timeout=30)
     res.raise_for_status()
@@ -380,6 +397,7 @@ def get_articles(  # noqa:C901
 def _get_xml(pubmed_ids: Iterable[str], timeout: int | None = None) -> etree.ElementTree:
     """Query the PubMed API and parse the returned XML."""
     params = {"db": "pubmed", "id": ",".join(pubmed_ids), "retmode": "xml"}
+    _finish_params(params)
     response = ratelimited_requests_get(EUTILS_FETCH_URL, params=params, timeout=timeout or 300)
     try:
         tree = etree.fromstring(response.text)
@@ -410,3 +428,39 @@ def get_articles_dict(
             pubmed_ids, error_strategy="skip", progress=progress, batch_size=batch_size
         )
     }
+
+
+def get_dois_from_pubmed_ids(pubmed_ids: Iterable[str | int]) -> dict[str, str]:
+    """Get a mapping from PubMed IDs to DOIs."""
+    rv = {}
+    for article in get_articles(pubmed_ids, error_strategy="none"):
+        if article is not None and article.doi is not None:
+            rv[str(article.pubmed)] = article.doi
+    return rv
+
+
+def get_pubmed_ids_from_dois(
+    dois: Collection[str],
+    *,
+    timeout: int | None = None,
+    batch_size: int | None = None,
+) -> dict[str, str]:
+    """Find PubMed IDs for multiple DOIs in a single request."""
+    if batch_size is None:
+        batch_size = 200
+    pubmeds = set()
+    for batch in batched(dois, batch_size):
+        batch_list = list(batch)
+        query = " OR ".join(f'"{doi}"[aid]' for doi in batch_list)
+        params = {"db": "pubmed", "term": query, "retmode": "json", "retmax": len(batch_list)}
+        _finish_params(params)
+        response = ratelimited_requests_get(
+            EUTILS_SEARCH_URL, params=params, timeout=timeout or 300
+        )
+        response.raise_for_status()
+        pubmeds.update(response.json()["esearchresult"]["idlist"])
+    rv = {}
+    for article in get_articles(pubmeds, error_strategy="none"):
+        if article is not None and article.doi is not None:
+            rv[article.doi] = str(article.pubmed)
+    return rv
