@@ -388,7 +388,9 @@ def _extract_article(  # noqa:C901
         Reference(prefix=prefix, identifier=article_id_tag.text)
         for article_id_tag in pubmed_data.findall(".//ArticleIdList/ArticleId")
         # it duplicates its own reference here for some reason, skip PII since it's
-        if article_id_tag.text and (prefix := article_id_tag.attrib["IdType"]) not in SKIP_PREFIXES
+        if article_id_tag.text
+        and (prefix := article_id_tag.attrib["IdType"]) not in SKIP_PREFIXES
+        and " " not in article_id_tag.text
     ]
 
     history = [
