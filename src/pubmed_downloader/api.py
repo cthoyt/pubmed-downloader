@@ -215,6 +215,14 @@ class Article(BaseModel):
         # see https://www.ncbi.nlm.nih.gov/mesh/D016454
         return "D016454" in self.type_mesh_ids
 
+    @property
+    def doi(self) -> str | None:
+        """Get the article's DOI."""
+        for xref in self.xrefs:
+            if xref.prefix == "doi":
+                return xref.identifier
+        return None
+
 
 def _ensure_urls(url: str, cache_path: Path, *, force: bool) -> list[str]:
     if cache_path.is_file() and not force:
